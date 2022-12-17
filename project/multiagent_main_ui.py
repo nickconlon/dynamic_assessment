@@ -1,11 +1,10 @@
-import base64
-import numpy as np
 import json
 from PyQt5.QtWidgets import QMainWindow, QApplication
 from PyQt5.QtGui import QPixmap, QImage
 import PyQt5.QtCore as QtCore
 import sys
-import cv2
+import qdarktheme
+import traceback
 
 sys.path.append('../')
 import project.ui_multi_agent as ui
@@ -17,9 +16,9 @@ import project.multiagent_configs as configs
 class Generic_ZeroMQ_Listener(QtCore.QObject):
     message = QtCore.pyqtSignal(str)
 
-    def __init__(self, ip, port, topic):
+    def __init__(self, ip, port, topic, last_only, bind):
         QtCore.QObject.__init__(self)
-        self.sub = subscriber.ZmqSubscriber(ip, port, topic, last_only=True)
+        self.sub = subscriber.ZmqSubscriber(ip, port, topic, last_only=last_only, bind=bind)
         self.running = True
 
     def loop(self):
@@ -33,6 +32,11 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
         try:
             QMainWindow.__init__(self)
             self.setupUi(self)
+            """
+            TODO Testing
+            """
+            import multi_agent_environment as rendering
+            self.renderer = rendering.MultiAgentRendering([configs.AGENT1_ID, configs.AGENT2_ID])
 
             """
             Setup the control buttons
@@ -72,26 +76,17 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             QtCore.QTimer.singleShot(0, self.thread.start)
 
             """
-            Setup the map listener thread
-            """
-            self.mapThread = QtCore.QThread()
-            self.zeromq_self_map_listener = Generic_ZeroMQ_Listener("localhost", configs.MAP_PORT, "")
-            self.zeromq_self_map_listener.moveToThread(self.mapThread)
-            self.mapThread.started.connect(self.zeromq_self_map_listener.loop)
-            self.zeromq_self_map_listener.message.connect(self.map_update)
-            QtCore.QTimer.singleShot(0, self.mapThread.start)
-
-            """
             Setup the state listener thread
             """
             self.stateThread = QtCore.QThread()
-            self.zeromq_state_listener = Generic_ZeroMQ_Listener("localhost", configs.STATE_PORT, "")
+            self.zeromq_state_listener = Generic_ZeroMQ_Listener("*", configs.STATE_PORT, "", last_only=True, bind=True)
             self.zeromq_state_listener.moveToThread(self.stateThread)
             self.stateThread.started.connect(self.zeromq_state_listener.loop)
             self.zeromq_state_listener.message.connect(self.state_update)
             QtCore.QTimer.singleShot(0, self.stateThread.start)
         except Exception as e:
             print(e)
+            traceback.print_exc()
 
     def state_update_robot1(self, m):
         try:
@@ -123,6 +118,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.agent1_assessment_update(assessment_msg)
         except Exception as e:
             print(e)
+            traceback.print_exc()
 
     def state_update_robot2(self, m):
         try:
@@ -154,11 +150,15 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.agent2_assessment_update(assessment_msg)
         except Exception as e:
             print(e)
+            traceback.print_exc()
 
     def state_update(self, msg):
         try:
             m = json.loads(msg)
             m = m['data']
+            self.renderer.state_update(m)
+            img = self.renderer.render(mode="rgb_array")
+            self.render_map(img)
             if m[configs.MultiAgentState.STATUS_AGENTID] == configs.AGENT1_ID:
                 self.state_update_robot1(m)
             elif m[configs.MultiAgentState.STATUS_AGENTID] == configs.AGENT2_ID:
@@ -167,6 +167,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
                 print("ERROR")
         except Exception as e:
             print(e)
+            traceback.print_exc()
 
     def clear_area_buttons(self, agent_id):
         if agent_id == configs.AGENT1_ID:
@@ -189,6 +190,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             print('home')
         except Exception as e:
             print(e)
+            traceback.print_exc()
 
     def agent1_go_area1_button_click(self):
         try:
@@ -199,6 +201,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             print('area1')
         except Exception as e:
             print(e)
+            traceback.print_exc()
 
     def agent1_go_area2_button_click(self):
         try:
@@ -209,6 +212,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             print('area2')
         except Exception as e:
             print(e)
+            traceback.print_exc()
 
     def agent1_go_area3_button_click(self):
         try:
@@ -219,6 +223,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             print('area3')
         except Exception as e:
             print(e)
+            traceback.print_exc()
 
     def agent2_go_home_button_click(self):
         try:
@@ -229,6 +234,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             print('home')
         except Exception as e:
             print(e)
+            traceback.print_exc()
 
     def agent2_go_area1_button_click(self):
         try:
@@ -239,6 +245,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             print('area1')
         except Exception as e:
             print(e)
+            traceback.print_exc()
 
     def agent2_go_area2_button_click(self):
         try:
@@ -249,6 +256,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             print('area2')
         except Exception as e:
             print(e)
+            traceback.print_exc()
 
     def agent2_go_area3_button_click(self):
         try:
@@ -259,6 +267,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             print('area3')
         except Exception as e:
             print(e)
+            traceback.print_exc()
 
     def end_sim_button_click(self):
         try:
@@ -268,6 +277,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             print('stop')
         except Exception as e:
             print(e)
+            traceback.print_exc()
 
     def clear_drive_mode_buttons(self, agent_id):
         if agent_id == configs.AGENT1_ID:
@@ -339,6 +349,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.assess_button.setStyleSheet("background-color: none")
         except Exception as e:
             print(e)
+            traceback.print_exc()
 
     def agent2_assessment_update(self, msg):
         """ Update the assessment display for agent 2 """
@@ -359,33 +370,19 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.assess_button.setStyleSheet("background-color: none")
         except Exception as e:
             print(e)
+            traceback.print_exc()
+
+    def render_map(self, img):
+        image = QImage(img, img.shape[1], img.shape[0], img.shape[1] * 3, QImage.Format_RGB888)
+        pixmap = QPixmap.fromImage(image)
+        self.map_area.setPixmap(pixmap)
+        self.map_area.setScaledContents(True)
 
 
-    def map_update(self, msg):
-        """ Display the map/image """
-        try:
-            jpg_original = base64.b64decode(msg)
-            jpg_as_np = np.frombuffer(jpg_original, dtype=np.uint8)
-            img = cv2.imdecode(jpg_as_np, flags=1)
-            image = QImage(img, img.shape[1], img.shape[0], img.shape[1] * 3, QImage.Format_RGB888)
-            pixmap = QPixmap.fromImage(image)
-            self.map_area.setPixmap(pixmap)
-            self.map_area.setScaledContents(True)
-        except Exception as e:
-            print(e)
-
-
-import qdarktheme
 qdarktheme.enable_hi_dpi()
 
 app = QApplication(sys.argv)
 qdarktheme.setup_theme()
 MainWindow = myMainWindow()
-
-# https://github.com/Alexhuszagh/BreezeStyleSheets
-#app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-# or in new API
-#app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
-
 MainWindow.show()
 app.exec_()

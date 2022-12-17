@@ -4,6 +4,7 @@ from gym import Env, spaces
 import cv2
 import project.multiagent_configs as configs
 
+
 class Obstacle:
     def __init__(self, x, y, radius, color):
         self.xy = np.asarray([x, y])
@@ -52,7 +53,7 @@ class Environment(Env):
         self.craters = _craters if _craters is not None else []
 
         """ Rendering in BGR"""
-        #TODO this should be an argument or figure out how to do relative pathing
+        # TODO this should be an argument or figure out how to do relative pathing
         self.base_image = cv2.imread("./imgs/mars.jpg")
         self.path_color = (107, 183, 189)
         self.goal_color = (0, 255, 0)
@@ -184,20 +185,17 @@ class Environment(Env):
             _image = cv2.line(_image, (minn + 5, y + 5), (maxx + 5, y + 5), color=(0, 0, 0), thickness=2)
         return _image
 
-    def draw_shapes(self, img):
+    def draw_shapes(self, img, position, color):
         """
         Shaded areas for obstacles.
         """
-        shapes = np.zeros_like(img, np.uint8)
+        shapes = img.copy()
         scale = 10
-        for obstacle in self.obstacles:
-            shapes = cv2.circle(shapes, (obstacle.xy[0] * scale, obstacle.xy[1] * scale), obstacle.r * scale,
-                                (255, 255, 255),
-                                cv2.FILLED)
+        FOV = 3
+        shapes = cv2.circle(shapes, (position[0] * scale, position[1] * scale), FOV * scale, color, cv2.FILLED)
         out = img.copy()
-        alpha = 0.8
-        mask = shapes.astype(bool)
-        out[mask] = cv2.addWeighted(img, alpha, shapes, 1 - alpha, 0)[mask]
+        alpha = 0.4
+        cv2.addWeighted(shapes, alpha, img, 1 - alpha, 0, out)
 
         return out
 
@@ -267,7 +265,6 @@ class Environment(Env):
 
 if __name__ == '__main__':
     from project.solvers.q_learning_policy import q_policies
-    import configs
 
     initial_state = configs.LOCATIONS[configs.HOME].position
     goal_location = configs.LOCATIONS[configs.AREA_1].position
@@ -293,15 +290,15 @@ if __name__ == '__main__':
     for i in range(100):
         env.render()
         # a = env.greedy_policy(0.9)
-        #a = pi.noisy_pi(s, 0.9)
-        a = policy_container.pi(s, initial_goal)
+        # a = pi.noisy_pi(s, 0.9)
+        a = policy_container.get_policy(s, initial_goal)
         if 15 < i < 30:
-            env.change_event(goal_changed=configs.LOCATIONS[second_goal].position)
-            a = policy_container.pi(s, second_goal)
+            env.change_event(new_goal_label=second_goal)
+            a = policy_container.get_policy(s, second_goal)
 
         elif i >= 30:
-            env.change_event(goal_changed=configs.LOCATIONS[third_goal].position)
-            a = policy_container.pi(s, third_goal)
+            env.change_event(new_goal_label=third_goal)
+            a = policy_container.get_policy(s, third_goal)
         s, r, done, info = env.step(a)
         print(r)
         if done:

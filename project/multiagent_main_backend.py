@@ -2,6 +2,8 @@ import copy
 
 import time
 import threading
+import traceback
+
 import numpy as np
 import logging
 import matplotlib.pyplot as plt
@@ -62,10 +64,11 @@ class StateThread(threading.Thread):
             self.state.sim_current_time = int(time.time() - self.state.sim_start_time)
             _msg = configs.MessageHelpers.state_update(self.state.state_update_message())
             self.publisher.publish(_msg)
-            time.sleep(1)
+            time.sleep(0.5)
 
     def close(self):
         self.running = False
+
 
 def run_main(agent_id):
     """
@@ -76,9 +79,9 @@ def run_main(agent_id):
     """
     Initialize zmq stuff
     """
-    map_pub = ZmqPublisher("*", configs.MAP_PORT)
+    map_pub = ZmqPublisher(configs.HOST, configs.MAP_PORT, bind=False)
     control_sub = ZmqSubscriber(configs.HOST, configs.CONTROL_PORT, timeout=2500, last_only=False)
-    state_pub = ZmqPublisher("*", configs.STATE_PORT)
+    state_pub = ZmqPublisher(configs.HOST, configs.STATE_PORT, bind=False)
 
     """
     Initialize the application state machine
@@ -118,34 +121,20 @@ def run_main(agent_id):
     Initial state
     """
     state = env.reset()
-    robot_state.current_robot_location = tuple(env.xy_from_index(state))
+    robot_state.location = tuple(env.xy_from_index(state))
 
     """
     Self-assessment stuff
     """
     assessment = StaticAssessment()
     dynamics = DynamicAssessment()
-    _, _, predicted_states, _ = assessment.rollout(policy.policies[robot_state.goal],
-                                                   copy.deepcopy(env),
-                                                   env.xy_from_index(state),
-                                                   configs.OA_ROLLOUTS,
-                                                   configs.STATE_UNCERTAINTY)
     assessment_index = 0
-
-    """
-    Publish some pre-mission data
-    """
-    for i in range(5):
-        map_pub.publish(configs.MessageHelpers.map_out(env.render(mode="rgb_array")))
-        time.sleep(1)
-
+    predicted_states = np.array([[robot_state.location]])
     """
     Live task execution
     """
-    time_start = time.time()
-    event_timer = 0
+    event_timer = 2
     print('Ready to run')
-    fig, (a0, a1, a2) = plt.subplots(nrows=1, ncols=3)
     for i in range(10000):
 
         """
@@ -158,7 +147,7 @@ def run_main(agent_id):
         """
         if robot_state.needs_assessment:
             print("Running the assessment!")
-            rewards_oa, collision_oa, times_oa = assessment.run_goa_assessment(
+            rewards_oa, collision_oa, times_oa, predicted_states = assessment.run_goa_assessment(
                 policy.policies[robot_state.goal],
                 copy.deepcopy(env),
                 env.xy_from_index(state),
@@ -175,12 +164,7 @@ def run_main(agent_id):
             robot_state.time_assessment = times_oa
             robot_state.collision_assessment = collision_oa
 
-            _, _, predicted_states, _ = assessment.rollout(policy.policies[robot_state.goal],
-                                                           copy.deepcopy(env),
-                                                           env.xy_from_index(state),
-                                                           configs.OA_ROLLOUTS,
-                                                           configs.STATE_UNCERTAINTY)
-            assessment_index = 2
+            assessment_index = 1
             robot_state.needs_assessment = False
 
         """
@@ -215,7 +199,7 @@ def run_main(agent_id):
             robot_state.collision_count += info['collisions']
             robot_state.time_count += 1
             robot_state.delivery_count += info['rewards']
-            robot_state.current_robot_location = tuple(env.xy_from_index(state))
+            robot_state.location = tuple(env.xy_from_index(state))
 
             if done:
                 robot_state.needs_end_sim = True
@@ -223,28 +207,27 @@ def run_main(agent_id):
 
             if configs.ENABLE_ET_GOA:
                 needs_assessment = False
-                if assessment_index >= predicted_states.shape[0]:
-                    print('assessing due to no more data')
+                if assessment_index >= predicted_states.shape[1] or np.count_nonzero(np.isnan(predicted_states[:, assessment_index])):
+                    print('assessing due to lack of data')
                     needs_assessment = True
                 else:
-                    SI = dynamics.assessment(env.xy_from_index(state)[0], predicted_states[:, assessment_index, 0], a1)
-                    print('si: ', SI)
+                    #SI = dynamics.assessment(env.xy_from_index(state)[0], predicted_states[:, assessment_index, 0], a1)
+                    #print('si: ', SI)
                     predicted_state_t = copy.deepcopy(predicted_states[:, assessment_index])
                     predicted_state_t = predicted_state_t[~np.isnan(predicted_state_t).any(axis=1), :]
-                    p_expected = dynamics.tail(predicted_state_t, env.xy_from_index(state))
+                    try:
+                        p_expected = dynamics.tail(predicted_state_t, env.xy_from_index(state))
+                        print("tail: {:.2f}".format(p_expected))
+                    except Exception as e:
+                        p_expected = 0.0
+                        print(e)
+                        traceback.print_exc()
 
-                    print('tail: ', p_expected)
-
-                    if SI <= 0.01:
+                    if p_expected <= 0.01:
                         needs_assessment = True
                         print('assessing due to surprising data')
                 assessment_index += 1
                 robot_state.needs_assessment = needs_assessment
-
-        """
-        Publish the new in-mission data
-        """
-        map_pub.publish(configs.MessageHelpers.map_out(env.render(mode="rgb_array")))
 
         """
         Hold on a sec
@@ -255,15 +238,13 @@ def run_main(agent_id):
         Should we end the simulation?
         """
         if robot_state.needs_end_sim:
-            for _ in range(5):
-                map_pub.publish(configs.MessageHelpers.map_out(env.render(mode="rgb_array")))
             break
 
     """
     Saving off state
     """
     print(time.time())
-    print(' ', robot_state.current_robot_location)
+    print(' ', robot_state.location)
     print(' ', a)
     print(' ', robot_state.movement_state)
     print(' ', robot_state.goal)

@@ -62,7 +62,7 @@ class StaticAssessment(CompetencyAssessmentBase):
         collisions_oa = np.around(collisions_oa, decimals=2)
         times_oa = self.famsec.outcome_assessment(reward_dist=current_counts[2]+times, r_star=z_stars[2], swap=True)
         times_oa = np.around(times_oa, decimals=2)
-        return rewards_oa, collisions_oa, times_oa
+        return rewards_oa, collisions_oa, times_oa, states
 
 
 class DynamicAssessment(CompetencyAssessmentBase):
@@ -250,6 +250,7 @@ class DynamicAssessment(CompetencyAssessmentBase):
         # https://stats.stackexchange.com/questions/105133/tail-probabilities-of-multivariate-normal-distribution
         if pred.shape[0] <= 1:
             sigma = np.array([[2., 0], [0, 2]])
+            print('manual sigma')
         else:
             sigma = np.cov(pred.T)
 
