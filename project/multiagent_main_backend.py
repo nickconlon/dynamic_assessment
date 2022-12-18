@@ -5,8 +5,6 @@ import threading
 import traceback
 
 import numpy as np
-import logging
-import matplotlib.pyplot as plt
 import sys
 
 sys.path.append('../')
@@ -71,11 +69,6 @@ class StateThread(threading.Thread):
 
 
 def run_main(agent_id):
-    """
-        Logging
-        """
-    logging.basicConfig(filename='logging.log', format='%(asctime)s %(message)s', level=logging.INFO)
-    logging.info("testing the log file")
     """
     Initialize zmq stuff
     """
