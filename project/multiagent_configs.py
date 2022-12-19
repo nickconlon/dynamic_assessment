@@ -102,9 +102,11 @@ class MultiAgentState:
     STATUS_SIM_TIME = 'STATUS_SIM_TIME'
     STATUS_HITS = 'STATUS_HITS'
     STATUS_GOAL = 'STATUS_GOAL'
-    STATUS_DELIVERIES = 'STATUS_DELIVERIES'
+    STATUS_REWARDS = 'STATUS_REWARDS'
+    STATUS_ZONES = 'STATUS_ZONES'
+    STATUS_CRATERS = 'STATUS_CRATERS'
     STATUS_COLOR = 'STATUS_COLOR'
-    STATUS_DELIVERY_GOA = 'STATUS_DELIVERY_GOA'
+    STATUS_REWARD_GOA = 'STATUS_REWARD_GOA'
     STATUS_COLLISIONS_GOA = 'STATUS_COLLISIONS_GOA'
     STATUS_TIME_GOA = 'STATUS_TIME_GOA'
 
@@ -120,7 +122,6 @@ class MultiAgentState:
         self.movement_state = MultiAgentState.STOP  # START/STOP
         self.location = [0, 0]  # (X,Y)
         self.goal = HOME  # AREA1, AREA2, AREA3, HOME
-        self.deliveries = 0  # Integer
         self.color = agent_color  # RED, BLUE, GREEN
         self.sim_start_time = start_time  # Integer
         self.sim_current_time = 0  # Integer
@@ -146,15 +147,23 @@ class MultiAgentState:
                             self.STATUS_HITS: self.collision_count,
                             self.STATUS_GOAL: self.goal,
                             self.STATUS_SIM_TIME: self.sim_current_time,
-                            self.STATUS_DELIVERIES: self.deliveries,
+                            self.STATUS_REWARDS: self.reward_count,
+                            self.STATUS_ZONES: self.zone_count,
+                            self.STATUS_CRATERS: self.collision_count,
                             self.STATUS_COLOR: self.color,
-                            self.STATUS_DELIVERY_GOA: convert_famsec(self.reward_assessment),
+                            self.STATUS_REWARD_GOA: convert_famsec(self.reward_assessment),
                             self.STATUS_COLLISIONS_GOA: convert_famsec(self.collision_assessment),
                             self.STATUS_TIME_GOA: convert_famsec(self.zone_assessment)}
         return single_agent_msg
 
 
 class MessageHelpers:
+    TOPICS_END_SIM = 'END_SIM'
+    TOPICS_ASSESSMENT_REQUEST = 'ASSESSMENT_REQUEST'
+    TOPICS_MOVE_REQUEST = 'MOVE_REQUEST'
+    TOPICS_GOAL_REQUEST = 'GOAL_REQUEST'
+    TOPICS_STATE_UPDATE = 'STATE_UPDATE'
+
     @staticmethod
     def unpack(msg):
         msg = json.loads(msg)
@@ -168,12 +177,12 @@ class MessageHelpers:
 
     @staticmethod
     def end_sim():
-        return MessageHelpers.pack_message('END_SIM', '')
+        return MessageHelpers.pack_message(MessageHelpers.TOPICS_END_SIM, '')
 
     @staticmethod
     def state_update(msg):
         """ to UI from backend """
-        return MessageHelpers.pack_message('STATE_UPDATE', msg)
+        return MessageHelpers.pack_message(MessageHelpers.TOPICS_STATE_UPDATE, msg)
 
     @staticmethod
     def assessment_request(agent_id, reward_threshold, zone_threshold, collision_threshold):
@@ -182,7 +191,7 @@ class MessageHelpers:
                'REWARD': reward_threshold,
                'ZONE': zone_threshold,
                'COLLISIONS': collision_threshold}
-        return MessageHelpers.pack_message('ASSESSMENT_REQUEST', msg)
+        return MessageHelpers.pack_message(MessageHelpers.TOPICS_ASSESSMENT_REQUEST, msg)
 
     @staticmethod
     def unpack_assessment_request(msg):
@@ -194,7 +203,7 @@ class MessageHelpers:
         """ to backend from UI """
         msg = {'AGENTID': agent_id,
                'STATE': state}
-        return MessageHelpers.pack_message('MOVE_REQUEST', msg)
+        return MessageHelpers.pack_message(MessageHelpers.TOPICS_MOVE_REQUEST, msg)
 
     @staticmethod
     def unpack_move_request(msg):
@@ -206,7 +215,7 @@ class MessageHelpers:
         """ to backend from UI """
         msg = {'AGENTID': agent_id,
                'GOAL': new_goal}
-        return MessageHelpers.pack_message('GOAL_REQUEST', msg)
+        return MessageHelpers.pack_message(MessageHelpers.TOPICS_GOAL_REQUEST, msg)
 
     @staticmethod
     def unpack_goal_request(msg):

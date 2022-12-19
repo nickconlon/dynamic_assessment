@@ -4,7 +4,7 @@ from gym import Env, spaces
 import cv2
 import project.multiagent_configs as configs
 from project.multiagent_configs import Obstacle
-
+import logging
 
 class Environment(Env):
     def __init__(self, _pos_start, _goal, _obstacles=None, _zones=None, _craters=None):
@@ -291,9 +291,10 @@ if __name__ == '__main__':
     events = [configs.Event(event_time=1, changed_zones=zones1),
               configs.Event(event_time=15, changed_zones=zones2)]
     s = env.reset()
-
+    logging.basicConfig(filename='test.log',format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p' )
     for i in range(100):
         [events.remove(e) if env.apply_event(e, i) is 1 else 0 for e in events]
+        logging.warning("test")
         env.render()
         a = policy_container.get_policy(s, configs.AREA_1)
         s, r, done, info = env.step(a)

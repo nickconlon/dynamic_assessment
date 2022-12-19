@@ -52,9 +52,7 @@ class MultiAgentRendering(single_agent_environment.Environment):
         self.agent_ids = copy.deepcopy(agent_ids)
         self.previous_positions = {}
         self.states = {}
-        for agent_id in self.agent_ids:
-            self.previous_positions[agent_id] = []
-            self.states[agent_id] = {}
+        self.reset()
 
     def state_update(self, state_msg):
         agent_id = state_msg[configs.MultiAgentState.STATUS_AGENTID]
@@ -116,6 +114,11 @@ class MultiAgentRendering(single_agent_environment.Environment):
             _image = cv2.cvtColor(_image, cv2.COLOR_BGR2RGB)
             return _image
 
+    def reset(self):
+        super().reset()
+        for agent_id in self.agent_ids:
+            self.previous_positions[agent_id] = []
+            self.states[agent_id] = {}
 
 if __name__ == '__main__':
     from project.solvers.q_learning_policy import q_policies

@@ -3,7 +3,7 @@ import copy
 import time
 import threading
 import traceback
-
+import logging
 import numpy as np
 import sys
 
@@ -28,23 +28,26 @@ class ControlThread(threading.Thread):
         while self.running:
             _msg = self.subscriber.receive()
             if len(_msg) > 0:
-                _topic, _msg = configs.MessageHelpers.unpack(_msg)
-                if _topic == 'END_SIM':
+                _topic, _data = configs.MessageHelpers.unpack(_msg)
+                if _topic == configs.MessageHelpers.TOPICS_END_SIM:
                     self.state.needs_end_sim = True
-                elif configs.MessageHelpers.for_me(_msg, self.state.agent_id):
-                    if _topic == 'ASSESSMENT_REQUEST':
-                        agent_id, delivery_thresh, time_thresh, collisions_thresh = configs.MessageHelpers.unpack_assessment_request(_msg)
+                    logging.info(_msg)
+                elif configs.MessageHelpers.for_me(_data, self.state.agent_id):
+                    if _topic == configs.MessageHelpers.TOPICS_ASSESSMENT_REQUEST:
+                        agent_id, delivery_thresh, time_thresh, collisions_thresh = configs.MessageHelpers.unpack_assessment_request(_data)
                         self.state.reward_assessment_threshold = delivery_thresh
                         self.state.collision_assessment_threshold = collisions_thresh
                         self.state.zone_assessment_threshold = time_thresh
                         self.state.needs_assessment = True
-                    elif _topic == 'MOVE_REQUEST':
-                        agent_id, movement_state = configs.MessageHelpers.unpack_move_request(_msg)
+                    elif _topic == configs.MessageHelpers.TOPICS_MOVE_REQUEST:
+                        agent_id, movement_state = configs.MessageHelpers.unpack_move_request(_data)
                         self.state.movement_state = movement_state
-                    elif _topic == 'GOAL_REQUEST':
-                        agent_id, new_goal = configs.MessageHelpers.unpack_goal_request(_msg)
+                    elif _topic == configs.MessageHelpers.TOPICS_GOAL_REQUEST:
+                        agent_id, new_goal = configs.MessageHelpers.unpack_goal_request(_data)
                         self.state.goal = new_goal
-                    print('topic: {}, data: {}'.format(_topic, _msg))
+
+                    logging.info(_msg)
+                    print('topic: {}, data: {}'.format(_topic, _data))
 
     def close(self):
         self.running = False
@@ -62,6 +65,7 @@ class StateThread(threading.Thread):
             self.state.sim_current_time = int(time.time() - self.state.sim_start_time)
             _msg = configs.MessageHelpers.state_update(self.state.state_update_message())
             self.publisher.publish(_msg)
+            logging.info(_msg)
             time.sleep(0.5)
 
     def close(self):
@@ -69,6 +73,11 @@ class StateThread(threading.Thread):
 
 
 def run_main(agent_id):
+    logging.basicConfig(filename='ID_{}.log'.format(agent_id),
+                        format='%(asctime)s %(message)s',
+                        datefmt='%m/%d/%Y %I:%M:%S %p',
+                        level=logging.INFO)
+
     """
     Initialize zmq stuff
     """
@@ -123,10 +132,10 @@ def run_main(agent_id):
     dynamics = DynamicAssessment()
     assessment_index = 0
     predicted_states = np.array([[robot_state.location]])
+
     """
     Live task execution
     """
-    event_timer = 0
     print('Ready to run')
     for i in range(10000):
         """

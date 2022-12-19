@@ -112,7 +112,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             elif m[configs.MultiAgentState.STATUS_STATE] == configs.MultiAgentState.START:
                 self.startControlButton.setStyleSheet("background-color: green")
 
-            assessment_msg = {'rewards': m[configs.MultiAgentState.STATUS_DELIVERY_GOA],
+            assessment_msg = {'rewards': m[configs.MultiAgentState.STATUS_REWARD_GOA],
                               'collisions': m[configs.MultiAgentState.STATUS_COLLISIONS_GOA],
                               'zones': m[configs.MultiAgentState.STATUS_TIME_GOA]}
             self.agent1_assessment_update(assessment_msg)
@@ -145,7 +145,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             elif m[configs.MultiAgentState.STATUS_STATE] == configs.MultiAgentState.START:
                 self.robot2_startControlButton.setStyleSheet("background-color: green")
 
-            assessment_msg = {'rewards': m[configs.MultiAgentState.STATUS_DELIVERY_GOA],
+            assessment_msg = {'rewards': m[configs.MultiAgentState.STATUS_REWARD_GOA],
                               'collisions': m[configs.MultiAgentState.STATUS_COLLISIONS_GOA],
                               'times': m[configs.MultiAgentState.STATUS_TIME_GOA]}
             self.agent2_assessment_update(assessment_msg)
@@ -275,6 +275,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.stopSimButton.setStyleSheet("background-color: green")
             _msg = configs.MessageHelpers.end_sim()
             self.controlpub.publish(_msg)
+            self.renderer.reset()
             print('stop')
         except Exception as e:
             print(e)
