@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1721</width>
-    <height>892</height>
+    <width>1648</width>
+    <height>621</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -20,7 +20,7 @@
       <x>580</x>
       <y>10</y>
       <width>1031</width>
-      <height>761</height>
+      <height>511</height>
      </rect>
     </property>
     <property name="frameShape">
@@ -93,7 +93,7 @@
       <property name="geometry">
        <rect>
         <x>60</x>
-        <y>30</y>
+        <y>20</y>
         <width>47</width>
         <height>31</height>
        </rect>
@@ -116,10 +116,10 @@
      <widget class="QLabel" name="description_label">
       <property name="geometry">
        <rect>
-        <x>0</x>
+        <x>10</x>
         <y>0</y>
-        <width>171</width>
-        <height>31</height>
+        <width>151</width>
+        <height>51</height>
        </rect>
       </property>
       <property name="font">
@@ -128,10 +128,11 @@
        </font>
       </property>
       <property name="text">
-       <string>Min acceptable deliveries</string>
+       <string>Min acceptable
+reward:</string>
       </property>
      </widget>
-     <widget class="QSlider" name="assessment_slider">
+     <widget class="QSlider" name="outcome_assessment_slider_rewards">
       <property name="geometry">
        <rect>
         <x>10</x>
@@ -185,7 +186,7 @@
       <property name="geometry">
        <rect>
         <x>60</x>
-        <y>30</y>
+        <y>20</y>
         <width>47</width>
         <height>31</height>
        </rect>
@@ -208,7 +209,7 @@
         <x>10</x>
         <y>0</y>
         <width>151</width>
-        <height>31</height>
+        <height>51</height>
        </rect>
       </property>
       <property name="font">
@@ -217,10 +218,11 @@
        </font>
       </property>
       <property name="text">
-       <string>Max acceptable time</string>
+       <string>Max acceptable zone
+hits:</string>
       </property>
      </widget>
-     <widget class="QSlider" name="outcome_assessment_slider_2">
+     <widget class="QSlider" name="outcome_assessment_slider_zones">
       <property name="geometry">
        <rect>
         <x>10</x>
@@ -273,7 +275,7 @@
      <property name="frameShadow">
       <enum>QFrame::Raised</enum>
      </property>
-     <widget class="QSlider" name="outcome_assessment_slider_3">
+     <widget class="QSlider" name="outcome_assessment_slider_craters">
       <property name="geometry">
        <rect>
         <x>10</x>
@@ -311,7 +313,7 @@
       <property name="geometry">
        <rect>
         <x>60</x>
-        <y>30</y>
+        <y>20</y>
         <width>47</width>
         <height>31</height>
        </rect>
@@ -331,10 +333,10 @@
      <widget class="QLabel" name="description_label_3">
       <property name="geometry">
        <rect>
-        <x>20</x>
+        <x>10</x>
         <y>0</y>
-        <width>131</width>
-        <height>31</height>
+        <width>151</width>
+        <height>51</height>
        </rect>
       </property>
       <property name="font">
@@ -343,7 +345,8 @@
        </font>
       </property>
       <property name="text">
-       <string>Min acceptable hits</string>
+       <string>Min acceptable crater
+hits:</string>
       </property>
      </widget>
     </widget>
@@ -383,7 +386,7 @@
       </font>
      </property>
      <property name="text">
-      <string>-</string>
+      <string>0</string>
      </property>
      <property name="alignment">
       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
@@ -794,7 +797,7 @@
       <property name="lineWidth">
        <number>4</number>
       </property>
-      <widget class="QLabel" name="robot2_oa_time_value">
+      <widget class="QLabel" name="robot2_oa_zones_value">
        <property name="geometry">
         <rect>
          <x>10</x>
@@ -839,7 +842,7 @@
       <property name="lineWidth">
        <number>4</number>
       </property>
-      <widget class="QLabel" name="robot2_oa_deliveries_value">
+      <widget class="QLabel" name="robot2_oa_rewards_value">
        <property name="geometry">
         <rect>
          <x>10</x>
@@ -951,7 +954,7 @@
       <property name="lineWidth">
        <number>4</number>
       </property>
-      <widget class="QLabel" name="assessment_value">
+      <widget class="QLabel" name="robot1_oa_rewards_value">
        <property name="geometry">
         <rect>
          <x>10</x>
@@ -996,7 +999,7 @@
       <property name="lineWidth">
        <number>4</number>
       </property>
-      <widget class="QLabel" name="outcome_assessment_value_3">
+      <widget class="QLabel" name="robot1_oa_hits_value">
        <property name="geometry">
         <rect>
          <x>10</x>
@@ -1041,7 +1044,7 @@
       <property name="lineWidth">
        <number>4</number>
       </property>
-      <widget class="QLabel" name="outcome_assessment_value_2">
+      <widget class="QLabel" name="robot1_oa_zones_value">
        <property name="geometry">
         <rect>
          <x>10</x>
@@ -1403,7 +1406,7 @@
       <x>20</x>
       <y>440</y>
       <width>551</width>
-      <height>141</height>
+      <height>81</height>
      </rect>
     </property>
     <property name="autoFillBackground">
@@ -1422,7 +1425,7 @@
      <property name="geometry">
       <rect>
        <x>90</x>
-       <y>40</y>
+       <y>10</y>
        <width>391</width>
        <height>61</height>
       </rect>
@@ -1491,7 +1494,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1721</width>
+     <width>1648</width>
      <height>21</height>
     </rect>
    </property>

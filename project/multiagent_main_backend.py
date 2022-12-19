@@ -12,7 +12,7 @@ import project.multiagent_configs as configs
 from project.solvers.q_learning_policy import q_policies
 from project.communications.zmq_publisher import ZmqPublisher
 from project.communications.zmq_subscriber import ZmqSubscriber
-from project.environment import Environment, Obstacle
+from project.environment import Environment
 from project.assessment.assessments import StaticAssessment, DynamicAssessment
 
 
@@ -34,9 +34,9 @@ class ControlThread(threading.Thread):
                 elif configs.MessageHelpers.for_me(_msg, self.state.agent_id):
                     if _topic == 'ASSESSMENT_REQUEST':
                         agent_id, delivery_thresh, time_thresh, collisions_thresh = configs.MessageHelpers.unpack_assessment_request(_msg)
-                        self.state.delivery_assessment_threshold = delivery_thresh
+                        self.state.reward_assessment_threshold = delivery_thresh
                         self.state.collision_assessment_threshold = collisions_thresh
-                        self.state.time_assessment_threshold = time_thresh
+                        self.state.zone_assessment_threshold = time_thresh
                         self.state.needs_assessment = True
                     elif _topic == 'MOVE_REQUEST':
                         agent_id, movement_state = configs.MessageHelpers.unpack_move_request(_msg)
@@ -126,10 +126,9 @@ def run_main(agent_id):
     """
     Live task execution
     """
-    event_timer = 2
+    event_timer = 0
     print('Ready to run')
     for i in range(10000):
-
         """
         Make sure the env has the correct goal
         """
@@ -140,21 +139,21 @@ def run_main(agent_id):
         """
         if robot_state.needs_assessment:
             print("Running the assessment!")
-            rewards_oa, collision_oa, times_oa, predicted_states = assessment.run_goa_assessment(
+            rewards_oa, collision_oa, zones_oa, predicted_states = assessment.run_goa_assessment(
                 policy.policies[robot_state.goal],
                 copy.deepcopy(env),
                 env.xy_from_index(state),
                 configs.OA_ROLLOUTS,
-                [robot_state.delivery_assessment_threshold,
+                [robot_state.reward_assessment_threshold,
                  robot_state.collision_assessment_threshold,
-                 robot_state.time_assessment_threshold],
-                [robot_state.delivery_count,
+                 robot_state.zone_assessment_threshold],
+                [robot_state.reward_count,
                  robot_state.collision_count,
-                 robot_state.time_count],
+                 robot_state.zone_count],
                 configs.STATE_UNCERTAINTY)
 
-            robot_state.delivery_assessment = rewards_oa
-            robot_state.time_assessment = times_oa
+            robot_state.reward_assessment = rewards_oa
+            robot_state.zone_assessment = zones_oa
             robot_state.collision_assessment = collision_oa
 
             assessment_index = 1
@@ -166,18 +165,6 @@ def run_main(agent_id):
         if robot_state.movement_state == configs.MultiAgentState.START:
             a = policy.policies[robot_state.goal].pi(state)
             time.sleep(configs.SPEED_AUTONOMY)
-
-            ### TODO trying out events
-            event_timer += 1
-            if event_timer == 1:
-                zones = [Obstacle(int(x), int(y), 1, configs.ZONE_COLOR) for (x, y) in
-                         zip(np.random.normal(loc=40, scale=5, size=75),
-                             np.random.normal(loc=20, scale=5, size=75))]
-                craters = [Obstacle(int(x), int(y), 1, configs.CRATER_COLOR) for (x, y) in
-                           zip(np.random.normal(loc=40, scale=5, size=75),
-                               np.random.normal(loc=20, scale=5, size=75))]
-                env.change_event(new_zones=zones, new_craters=craters)
-            ###
         else:
             a = -1
 
@@ -190,8 +177,9 @@ def run_main(agent_id):
             Update the current state
             """
             robot_state.collision_count += info['collisions']
-            robot_state.time_count += 1
-            robot_state.delivery_count += info['rewards']
+            robot_state.zone_count += info['zones']
+            robot_state.reward_count += info['rewards']
+
             robot_state.location = tuple(env.xy_from_index(state))
 
             if done:
@@ -242,7 +230,7 @@ def run_main(agent_id):
     print(' ', robot_state.movement_state)
     print(' ', robot_state.goal)
     print(' ', robot_state.collision_count)
-    print(' ', robot_state.delivery_assessment_threshold)
+    print(' ', robot_state.reward_assessment_threshold)
 
     print("Ending loop and shutting down")
     thread.close()

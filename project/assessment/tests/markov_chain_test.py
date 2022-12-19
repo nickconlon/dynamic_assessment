@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 
+import project.multiagent_configs
 from project.solvers.q_learning_policy import q_policy
 import project.configs as configs
 import project.environment as Env
@@ -75,8 +76,8 @@ for i in range(10):
     sa = StaticAssessment()
     rewards, collisions, predictions, times = sa.rollout(policy, env, s0, 10, 0.99)
     prediction_index = 2
-    zones = [Env.Obstacle(int(x), int(y), 2, configs.ZONE_COLOR) for (x, y) in
-                 zip(np.random.normal(loc=30, scale=1, size=10), np.random.normal(loc=20, scale=1, size=10))]
+    zones = [project.multiagent_configs.Obstacle(int(x), int(y), 2, configs.ZONE_COLOR) for (x, y) in
+             zip(np.random.normal(loc=30, scale=1, size=10), np.random.normal(loc=20, scale=1, size=10))]
     craters = []
     env.change_event(new_zones=[], new_craters=craters)
     env.reset(state=s0)
@@ -86,7 +87,7 @@ for i in range(10):
         s_hat = np.dot(S, TT)
         a = policy.noisy_pi(s, p_correct=0.99)
         if i == 25:
-            zones = [Env.Obstacle(int(x), int(y), 2, configs.ZONE_COLOR) for (x, y) in
+            zones = [project.multiagent_configs.Obstacle(int(x), int(y), 2, configs.ZONE_COLOR) for (x, y) in
                      zip(np.random.normal(loc=30, scale=1, size=5),
                          np.random.normal(loc=20, scale=1, size=5))]
             env.change_event(new_zones=zones)

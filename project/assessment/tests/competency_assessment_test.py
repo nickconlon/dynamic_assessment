@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 import traceback
 
 from project.assessment.assessments import StaticAssessment, DynamicAssessment
-from project.environment import Environment, Obstacle
+from project.environment import Environment
+from project.multiagent_configs import Obstacle
 import project.configs as configs
 from project.solvers.q_learning_policy import q_policy
 

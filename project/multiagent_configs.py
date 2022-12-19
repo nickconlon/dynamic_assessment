@@ -30,7 +30,6 @@ AGENT1_ID = 1
 AGENT2_ID = 2
 AGENT3_ID = 3
 
-
 #
 # Initial environment and state
 #
@@ -128,17 +127,17 @@ class MultiAgentState:
         self.needs_assessment = False
         self.needs_end_sim = False
 
-        self.delivery_assessment_threshold = 0
-        self.delivery_assessment = 1  # String
-        self.delivery_count = 0
+        self.reward_assessment_threshold = 0
+        self.reward_assessment = 1  # String
+        self.reward_count = 0
 
         self.collision_assessment_threshold = 0  # String
         self.collision_assessment = 1  # String
         self.collision_count = 0  # Integer
 
-        self.time_assessment_threshold = 0  # String
-        self.time_assessment = 1  # String
-        self.time_count = 0
+        self.zone_assessment_threshold = 0  # String
+        self.zone_assessment = 1  # String
+        self.zone_count = 0
 
     def state_update_message(self):
         single_agent_msg = {self.STATUS_AGENTID: self.agent_id,
@@ -149,9 +148,9 @@ class MultiAgentState:
                             self.STATUS_SIM_TIME: self.sim_current_time,
                             self.STATUS_DELIVERIES: self.deliveries,
                             self.STATUS_COLOR: self.color,
-                            self.STATUS_DELIVERY_GOA: convert_famsec(self.delivery_assessment),
+                            self.STATUS_DELIVERY_GOA: convert_famsec(self.reward_assessment),
                             self.STATUS_COLLISIONS_GOA: convert_famsec(self.collision_assessment),
-                            self.STATUS_TIME_GOA: convert_famsec(self.time_assessment)}
+                            self.STATUS_TIME_GOA: convert_famsec(self.zone_assessment)}
         return single_agent_msg
 
 
@@ -177,18 +176,18 @@ class MessageHelpers:
         return MessageHelpers.pack_message('STATE_UPDATE', msg)
 
     @staticmethod
-    def assessment_request(agent_id, delivery_threshold, time_threshold, collision_threshold):
+    def assessment_request(agent_id, reward_threshold, zone_threshold, collision_threshold):
         """ to backend from UI """
         msg = {'AGENTID': agent_id,
-               'DELIVERY': delivery_threshold,
-               'TIME': time_threshold,
+               'REWARD': reward_threshold,
+               'ZONE': zone_threshold,
                'COLLISIONS': collision_threshold}
         return MessageHelpers.pack_message('ASSESSMENT_REQUEST', msg)
 
     @staticmethod
     def unpack_assessment_request(msg):
         """ at backend """
-        return msg['AGENTID'], msg['DELIVERY'], msg['TIME'], msg['COLLISIONS']
+        return msg['AGENTID'], msg['REWARD'], msg['ZONE'], msg['COLLISIONS']
 
     @staticmethod
     def move_request(agent_id, state):
@@ -228,3 +227,32 @@ class MessageHelpers:
     @staticmethod
     def for_me(msg, agent_id):
         return msg['AGENTID'] == agent_id
+
+
+class Obstacle:
+    def __init__(self, x, y, radius, color):
+        self.xy = np.asarray([x, y])
+        self.r = radius
+        self.color = color
+
+    def collision(self, x, y):
+        d = np.linalg.norm(self.xy - np.asarray([x, y]))
+        if d < self.r:
+            return True
+        else:
+            return False
+
+
+class Event:
+    def __init__(self, event_time, changed_zones=None, changed_craters=None):
+        self.time = event_time
+        self.changed_zones = [] if changed_zones is None else changed_zones
+        self.changed_craters = [] if changed_craters is None else changed_craters
+
+
+zones1 = [Obstacle(int(x), int(y), 2, ZONE_COLOR) for (x, y) in
+          zip(np.random.normal(loc=40, scale=5, size=25), np.random.normal(loc=20, scale=5, size=25))]
+zones2 = [Obstacle(int(x), int(y), 2, ZONE_COLOR) for (x, y) in
+          zip(np.random.normal(loc=40, scale=5, size=25), np.random.normal(loc=20, scale=5, size=25))]
+events = [Event(event_time=1, changed_zones=zones1),
+          Event(event_time=15, changed_zones=zones2)]

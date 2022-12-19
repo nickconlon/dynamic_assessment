@@ -68,9 +68,9 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             """
             Setup the assessment listener thread
             """
-            self.assessment_slider.valueChanged.connect(self.self_assessment_value_update)
-            self.outcome_assessment_slider_2.valueChanged.connect(self.outcome_assessment_slider_2_update)
-            self.outcome_assessment_slider_3.valueChanged.connect(self.outcome_assessment_slider_3_update)
+            self.outcome_assessment_slider_rewards.valueChanged.connect(self.self_assessment_value_update)
+            self.outcome_assessment_slider_zones.valueChanged.connect(self.outcome_assessment_slider_2_update)
+            self.outcome_assessment_slider_craters.valueChanged.connect(self.outcome_assessment_slider_3_update)
             self.assess_button.clicked.connect(self.self_assessment_button_click)
             self.thread = QtCore.QThread()
             QtCore.QTimer.singleShot(0, self.thread.start)
@@ -114,7 +114,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
 
             assessment_msg = {'rewards': m[configs.MultiAgentState.STATUS_DELIVERY_GOA],
                               'collisions': m[configs.MultiAgentState.STATUS_COLLISIONS_GOA],
-                              'times': m[configs.MultiAgentState.STATUS_TIME_GOA]}
+                              'zones': m[configs.MultiAgentState.STATUS_TIME_GOA]}
             self.agent1_assessment_update(assessment_msg)
         except Exception as e:
             print(e)
@@ -125,7 +125,8 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             print(m[configs.MultiAgentState.STATUS_LOCATION])
             print(str(m[configs.MultiAgentState.STATUS_LOCATION]))
             self.robot2_location.setText(str(m[configs.MultiAgentState.STATUS_LOCATION]))
-            self.robot_time.setText(str(m[configs.MultiAgentState.STATUS_SIM_TIME]))
+            new_time = max(int(self.robot_time.text()), m[configs.MultiAgentState.STATUS_SIM_TIME])
+            self.robot_time.setText(str(new_time))
             self.robot2_craters.setText(str(m[configs.MultiAgentState.STATUS_HITS]))
             self.robot2_target_area.setText(str(m[configs.MultiAgentState.STATUS_GOAL]))
             self.clear_area_buttons(configs.AGENT2_ID)
@@ -325,11 +326,11 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
 
     def self_assessment_button_click(self):
         self.assess_button.setStyleSheet("background-color: green")
-        val = self.assessment_slider.value()
-        oa2_val = self.outcome_assessment_slider_2.value()
-        oa3_val = self.outcome_assessment_slider_3.value()
+        oa_rewards = self.outcome_assessment_slider_rewards.value()
+        oa_zones = self.outcome_assessment_slider_zones.value()
+        oa_hits = self.outcome_assessment_slider_craters.value()
         for agent_id in [configs.AGENT1_ID, configs.AGENT2_ID]:
-            _msg = configs.MessageHelpers.assessment_request(agent_id, val, oa2_val, oa3_val)
+            _msg = configs.MessageHelpers.assessment_request(agent_id, oa_rewards, oa_zones, oa_hits)
             print(_msg)
             self.controlpub.publish(_msg)
 
@@ -339,13 +340,15 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             print(msg)
             rewards = msg['rewards']
             collisions = msg['collisions']
-            times = msg['times']
-            self.assessment_value.setText(str(rewards))
-            self.assessment_value.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[rewards]))
-            self.outcome_assessment_value_2.setText(str(times))
-            self.outcome_assessment_value_2.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[times]))
-            self.outcome_assessment_value_3.setText(str(collisions))
-            self.outcome_assessment_value_3.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[collisions]))
+            times = msg['zones']
+            self.robot1_oa_rewards_value.setText(str(rewards))
+            self.robot1_oa_rewards_value.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[rewards]))
+
+            self.robot1_oa_zones_value.setText(str(times))
+            self.robot1_oa_zones_value.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[times]))
+
+            self.robot1_oa_hits_value.setText(str(collisions))
+            self.robot1_oa_hits_value.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[collisions]))
             self.assess_button.setStyleSheet("background-color: none")
         except Exception as e:
             print(e)
@@ -359,11 +362,11 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             collisions = msg['collisions']
             times = msg['times']
 
-            self.robot2_oa_deliveries_value.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[rewards]))
-            self.robot2_oa_deliveries_value.setText(str(times))
+            self.robot2_oa_rewards_value.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[rewards]))
+            self.robot2_oa_rewards_value.setText(str(times))
 
-            self.robot2_oa_time_value.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[times]))
-            self.robot2_oa_time_value.setText(str(times))
+            self.robot2_oa_zones_value.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[times]))
+            self.robot2_oa_zones_value.setText(str(times))
 
             self.robot2_oa_hits_value.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[collisions]))
             self.robot2_oa_hits_value.setText(str(collisions))

@@ -27,6 +27,7 @@ class StaticAssessment(CompetencyAssessmentBase):
 
         rewards = np.zeros(num_rollouts)
         collisions = np.zeros(num_rollouts)
+        zones = np.zeros(num_rollouts)
         times = np.zeros(num_rollouts)
 
         predictions = np.zeros((num_rollouts, max_length, 2)) * np.nan
@@ -40,29 +41,32 @@ class StaticAssessment(CompetencyAssessmentBase):
                 predictions[i, j + 1, :] = env.xy_from_index(s)
 
                 collisions[i] += info['collisions']
+                zones[i] += info['zones']
                 times[i] += 1
                 rewards[i] += info['rewards']
                 if done:
                     break
 
         # np.save('./data/noise_discrete.npy', predictions)
-        return rewards, collisions, predictions, times
+        return rewards, collisions, zones, predictions, times
 
     def run_assessment(self, policy, env, state, num_rollouts, z_star, transition_uncertainty):
-        rewards, collisions, states, times = self.rollout(policy, env, state, num_rollouts, transition_uncertainty)
+        rewards, collisions, zones, states, times = self.rollout(policy, env, state, num_rollouts, transition_uncertainty)
         oa = self.famsec.outcome_assessment(reward_dist=rewards, r_star=z_star)
         return oa, rewards, collisions, times, states
 
     def run_goa_assessment(self, policy, env, state, num_rollouts, z_stars, current_counts, transition_uncertainty) -> object:
-        rewards, collisions, states, times = self.rollout(policy, env, state, num_rollouts, transition_uncertainty)
+        rewards, collisions, zones, states, times = self.rollout(policy, env, state, num_rollouts, transition_uncertainty)
 
         rewards_oa = self.famsec.outcome_assessment(reward_dist=current_counts[0]+rewards, r_star=z_stars[0])
         rewards_oa = np.around(rewards_oa, decimals=2)
         collisions_oa = self.famsec.outcome_assessment(reward_dist=current_counts[1]+collisions, r_star=z_stars[1], swap=True)
         collisions_oa = np.around(collisions_oa, decimals=2)
-        times_oa = self.famsec.outcome_assessment(reward_dist=current_counts[2]+times, r_star=z_stars[2], swap=True)
-        times_oa = np.around(times_oa, decimals=2)
-        return rewards_oa, collisions_oa, times_oa, states
+        #times_oa = self.famsec.outcome_assessment(reward_dist=current_counts[2]+times, r_star=z_stars[2], swap=True)
+        #times_oa = np.around(times_oa, decimals=2)
+        zones_oa = self.famsec.outcome_assessment(reward_dist=current_counts[2]+zones, r_star=z_stars[2], swap=True)
+        zones_oa = np.around(zones_oa, decimals=2)
+        return rewards_oa, collisions_oa, zones_oa, states
 
 
 class DynamicAssessment(CompetencyAssessmentBase):

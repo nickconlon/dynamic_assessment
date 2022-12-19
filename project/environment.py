@@ -3,20 +3,7 @@ import copy
 from gym import Env, spaces
 import cv2
 import project.multiagent_configs as configs
-
-
-class Obstacle:
-    def __init__(self, x, y, radius, color):
-        self.xy = np.asarray([x, y])
-        self.r = radius
-        self.color = color
-
-    def collision(self, x, y):
-        d = np.linalg.norm(self.xy - np.asarray([x, y]))
-        if d < self.r:
-            return True
-        else:
-            return False
+from project.multiagent_configs import Obstacle
 
 
 class Environment(Env):
@@ -84,6 +71,8 @@ class Environment(Env):
         """
         Execute the action from the current position in this environment.
         """
+        craters_hit = 0
+        zone_hits = 0
         # Base transition
         if self.stochastic_transitions:
             if np.random.rand() > self.transition_probability:
@@ -94,6 +83,7 @@ class Environment(Env):
         # Slippery zones impact transition
         for zone in self.zones:
             if zone.collision(*self.pos):
+                zone_hits = 1
                 if np.random.rand() > 0.5:
                     possible_actions = list(self.actions.keys())
                     possible_actions.remove(action)
@@ -106,7 +96,7 @@ class Environment(Env):
             self.pos += self.actions[action]
 
         # Count up the craters we hit with the transition
-        craters_hit = 0
+
         for crater in self.craters:
             if crater.collision(*self.pos):
                 craters_hit = 1
@@ -116,7 +106,7 @@ class Environment(Env):
 
         _reward = -1 if not self.captured_goal() else +10
         _done = False if not self.captured_goal() else True
-        _info = {'collisions': craters_hit, 'times': self.num_steps, 'rewards': _reward}
+        _info = {'collisions': craters_hit, 'zones': zone_hits, 'times': self.num_steps, 'rewards': _reward}
         return self.index_from_xy(*self.pos), _reward, _done, _info
 
     def captured_goal(self):
@@ -152,6 +142,16 @@ class Environment(Env):
             self.zones = copy.deepcopy(new_zones)
         if new_goal_label is not None:
             self.goal = copy.deepcopy(configs.LOCATIONS[new_goal_label].position)
+
+    def apply_event(self, event, time):
+        """
+        Apply an event to this environment. Return 1 if the event was applied, 0 otherwise.
+        """
+        if event.time == time:
+            self.change_event(new_craters=event.changed_craters, new_zones=event.changed_zones)
+            return 1
+        else:
+            return 0
 
     def reset(self, state=None):
         """
@@ -283,22 +283,19 @@ if __name__ == '__main__':
     policy_container = q_policies(available_policies, available_target_names)
 
     env = Environment(initial_state, goal_location, _obstacles=obstacles, _zones=zones)
-    s = env.reset()
-    initial_goal = configs.AREA_1
-    second_goal = configs.AREA_2
-    third_goal = configs.HOME
-    for i in range(100):
-        env.render()
-        # a = env.greedy_policy(0.9)
-        # a = pi.noisy_pi(s, 0.9)
-        a = policy_container.get_policy(s, initial_goal)
-        if 15 < i < 30:
-            env.change_event(new_goal_label=second_goal)
-            a = policy_container.get_policy(s, second_goal)
 
-        elif i >= 30:
-            env.change_event(new_goal_label=third_goal)
-            a = policy_container.get_policy(s, third_goal)
+    zones1 = [Obstacle(int(x), int(y), 2, configs.ZONE_COLOR) for (x, y) in
+              zip(np.random.normal(loc=40, scale=5, size=25), np.random.normal(loc=20, scale=5, size=25))]
+    zones2 = [Obstacle(int(x), int(y), 2, configs.ZONE_COLOR) for (x, y) in
+              zip(np.random.normal(loc=40, scale=5, size=25), np.random.normal(loc=20, scale=5, size=25))]
+    events = [configs.Event(event_time=1, changed_zones=zones1),
+              configs.Event(event_time=15, changed_zones=zones2)]
+    s = env.reset()
+
+    for i in range(100):
+        [events.remove(e) if env.apply_event(e, i) is 1 else 0 for e in events]
+        env.render()
+        a = policy_container.get_policy(s, configs.AREA_1)
         s, r, done, info = env.step(a)
         print(r)
         if done:
