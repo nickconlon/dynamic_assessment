@@ -23,7 +23,7 @@ class StaticAssessment(CompetencyAssessmentBase):
 
     @staticmethod
     def rollout(policy, env, state, num_rollouts, transition_uncertainty):
-        max_length = 1000
+        max_length = 250
 
         rewards = np.zeros(num_rollouts)
         collisions = np.zeros(num_rollouts)

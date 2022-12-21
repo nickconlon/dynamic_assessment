@@ -47,7 +47,6 @@ STATE_UNCERTAINTY = 0.9
 # Control delays
 #
 SPEED_AUTONOMY = 0.5
-SPEED_HUMAN = 0.5
 
 
 class Location:
@@ -102,6 +101,8 @@ class MultiAgentState:
     STATUS_SIM_TIME = 'STATUS_SIM_TIME'
     STATUS_HITS = 'STATUS_HITS'
     STATUS_GOAL = 'STATUS_GOAL'
+    STATUS_DELIVERIES = 'STATUS_DELIVERIES'
+    STATUS_CARGO_COUNT = 'STATUS_CARGO_COUNT'
     STATUS_REWARDS = 'STATUS_REWARDS'
     STATUS_ZONES = 'STATUS_ZONES'
     STATUS_CRATERS = 'STATUS_CRATERS'
@@ -127,6 +128,9 @@ class MultiAgentState:
         self.sim_current_time = 0  # Integer
         self.needs_assessment = False
         self.needs_end_sim = False
+        self.at_goal = True
+        self.delivery_count = 0
+        self.cargo_count = 0
 
         self.reward_assessment_threshold = 0
         self.reward_assessment = 1  # String
@@ -153,7 +157,9 @@ class MultiAgentState:
                             self.STATUS_COLOR: self.color,
                             self.STATUS_REWARD_GOA: convert_famsec(self.reward_assessment),
                             self.STATUS_COLLISIONS_GOA: convert_famsec(self.collision_assessment),
-                            self.STATUS_TIME_GOA: convert_famsec(self.zone_assessment)}
+                            self.STATUS_TIME_GOA: convert_famsec(self.zone_assessment),
+                            self.STATUS_DELIVERIES: self.delivery_count,
+                            self.STATUS_CARGO_COUNT: self.cargo_count}
         return single_agent_msg
 
 
@@ -259,9 +265,17 @@ class Event:
         self.changed_craters = [] if changed_craters is None else changed_craters
 
 
-zones1 = [Obstacle(int(x), int(y), 2, ZONE_COLOR) for (x, y) in
-          zip(np.random.normal(loc=40, scale=5, size=25), np.random.normal(loc=20, scale=5, size=25))]
-zones2 = [Obstacle(int(x), int(y), 2, ZONE_COLOR) for (x, y) in
-          zip(np.random.normal(loc=40, scale=5, size=25), np.random.normal(loc=20, scale=5, size=25))]
-events = [Event(event_time=1, changed_zones=zones1),
-          Event(event_time=15, changed_zones=zones2)]
+def create_new_craters():
+    lx = np.random.randint(10, 50)
+    ly = np.random.randint(10, 50)
+    sx = np.random.randint(2, 10)
+    sy = np.random.randint(2, 10)
+    craters = [Obstacle(int(x), int(y), 2, CRATER_COLOR) for (x, y) in
+               zip(np.random.normal(loc=lx, scale=sx, size=100), np.random.normal(loc=ly, scale=sy, size=100))]
+    return craters
+
+zones1 = [Obstacle(int(x), int(y), 1, CRATER_COLOR) for (x, y) in
+          zip(np.random.normal(loc=25, scale=5, size=100), np.random.normal(loc=25, scale=5, size=100))]
+
+craters1 = create_new_craters()
+events = [Event(event_time=1, changed_craters=craters1)]

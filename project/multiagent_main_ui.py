@@ -37,6 +37,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             """
             import multi_agent_environment as rendering
             self.renderer = rendering.MultiAgentRendering([configs.AGENT1_ID, configs.AGENT2_ID])
+            self.renderer.change_event(new_craters=configs.craters1)
 
             """
             Setup the control buttons
@@ -93,9 +94,9 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             print(m[configs.MultiAgentState.STATUS_LOCATION])
             print(str(m[configs.MultiAgentState.STATUS_LOCATION]))
             self.robot_location.setText(str(m[configs.MultiAgentState.STATUS_LOCATION]))
-            self.robot_time.setText(str(m[configs.MultiAgentState.STATUS_SIM_TIME]))
             self.robot_craters.setText(str(m[configs.MultiAgentState.STATUS_HITS]))
-            self.robot_target_area.setText(str(m[configs.MultiAgentState.STATUS_GOAL]))
+            self.robot_zones.setText(str(m[configs.MultiAgentState.STATUS_ZONES]))
+            self.robot1_cargo.setText(str(m[configs.MultiAgentState.STATUS_CARGO_COUNT]))
             self.clear_area_buttons(1)
             if m[configs.MultiAgentState.STATUS_GOAL] == configs.HOME:
                 self.goHomeButton.setStyleSheet("background-color: green")
@@ -125,10 +126,8 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             print(m[configs.MultiAgentState.STATUS_LOCATION])
             print(str(m[configs.MultiAgentState.STATUS_LOCATION]))
             self.robot2_location.setText(str(m[configs.MultiAgentState.STATUS_LOCATION]))
-            new_time = max(int(self.robot_time.text()), m[configs.MultiAgentState.STATUS_SIM_TIME])
-            self.robot_time.setText(str(new_time))
             self.robot2_craters.setText(str(m[configs.MultiAgentState.STATUS_HITS]))
-            self.robot2_target_area.setText(str(m[configs.MultiAgentState.STATUS_GOAL]))
+            self.robot2_zones.setText(str(m[configs.MultiAgentState.STATUS_ZONES]))
             self.clear_area_buttons(configs.AGENT2_ID)
             if m[configs.MultiAgentState.STATUS_GOAL] == configs.HOME:
                 self.robot2_goHomeButton.setStyleSheet("background-color: green")
@@ -160,6 +159,13 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.renderer.state_update(m)
             img = self.renderer.render(mode="rgb_array")
             self.render_map(img)
+
+            new_time = max(int(self.time_counter.text()), m[configs.MultiAgentState.STATUS_SIM_TIME])
+            self.time_counter.setText(str(new_time))
+
+            new_deliveries = max(int(self.delivery_counter.text()), m[configs.MultiAgentState.STATUS_DELIVERIES])
+            self.delivery_counter.setText(str(new_deliveries))
+
             if m[configs.MultiAgentState.STATUS_AGENTID] == configs.AGENT1_ID:
                 self.state_update_robot1(m)
             elif m[configs.MultiAgentState.STATUS_AGENTID] == configs.AGENT2_ID:

@@ -6,6 +6,7 @@ import traceback
 import logging
 import numpy as np
 import sys
+import argparse
 
 sys.path.append('../')
 import project.multiagent_configs as configs
@@ -45,6 +46,7 @@ class ControlThread(threading.Thread):
                     elif _topic == configs.MessageHelpers.TOPICS_GOAL_REQUEST:
                         agent_id, new_goal = configs.MessageHelpers.unpack_goal_request(_data)
                         self.state.goal = new_goal
+                        self.state.at_goal = False
 
                     logging.info(_msg)
                     print('topic: {}, data: {}'.format(_topic, _data))
@@ -72,8 +74,8 @@ class StateThread(threading.Thread):
         self.running = False
 
 
-def run_main(agent_id):
-    logging.basicConfig(filename='ID_{}.log'.format(agent_id),
+def run_main(agent_id, mission_id, subject_id):
+    logging.basicConfig(filename='./data/{}_{}_{}_{}.log'.format(agent_id, mission_id, subject_id, time.time()),
                         format='%(asctime)s %(message)s',
                         datefmt='%m/%d/%Y %I:%M:%S %p',
                         level=logging.INFO)
@@ -103,8 +105,9 @@ def run_main(agent_id):
     """
     Setup the environment
     """
-    env = Environment(robot_state.location, configs.LOCATIONS[robot_state.goal].position,
-                      _obstacles=[], _zones=[], _craters=[])
+    env = Environment(robot_state.location, configs.HOME, _obstacles=[], _zones=[], _craters=[])
+    #env.apply_event(configs.events[0], 1)
+    env.change_event(new_craters=configs.craters1)
 
     """
     Setup the control policies
@@ -192,8 +195,13 @@ def run_main(agent_id):
             robot_state.location = tuple(env.xy_from_index(state))
 
             if done:
-                robot_state.needs_end_sim = True
                 robot_state.movement_state = configs.MultiAgentState.STOP
+                robot_state.at_goal = True
+                if info['location'] != configs.HOME:
+                    robot_state.delivery_count += robot_state.cargo_count
+                    robot_state.cargo_count = max(0, robot_state.cargo_count-1)
+                elif info['location'] == configs.HOME:
+                    robot_state.cargo_count = min(3, robot_state.cargo_count+3)
 
             if configs.ENABLE_ET_GOA:
                 needs_assessment = False
@@ -201,8 +209,6 @@ def run_main(agent_id):
                     print('assessing due to lack of data')
                     needs_assessment = True
                 else:
-                    #SI = dynamics.assessment(env.xy_from_index(state)[0], predicted_states[:, assessment_index, 0], a1)
-                    #print('si: ', SI)
                     predicted_state_t = copy.deepcopy(predicted_states[:, assessment_index])
                     predicted_state_t = predicted_state_t[~np.isnan(predicted_state_t).any(axis=1), :]
                     try:
@@ -234,12 +240,13 @@ def run_main(agent_id):
     Saving off state
     """
     print(time.time())
-    print(' ', robot_state.location)
-    print(' ', a)
-    print(' ', robot_state.movement_state)
-    print(' ', robot_state.goal)
-    print(' ', robot_state.collision_count)
-    print(' ', robot_state.reward_assessment_threshold)
+    print('location: ', robot_state.location)
+    print('state: ', robot_state.movement_state)
+    print('goal: ', robot_state.goal)
+    print('craters: ', robot_state.collision_count)
+    print('zones: ', robot_state.zone_count)
+    print('reward: ', robot_state.reward_count)
+    print('deliveries: ', robot_state.delivery_count)
 
     print("Ending loop and shutting down")
     thread.close()
@@ -249,8 +256,12 @@ def run_main(agent_id):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) == 2:
-        agent_id = int(sys.argv[1])
-    else:
-        agent_id = configs.AGENT1_ID
-    run_main(agent_id)
+    parser = argparse.ArgumentParser(prog='test', description='')
+    parser.add_argument('-a', '--agentid', required=True, type=int)
+    parser.add_argument('-m', '--missionid', required=True, type=int)
+    parser.add_argument('-s', '--subjectid', required=True, type=int)
+    args = parser.parse_args()
+    agent_id = args.agentid
+    mission_id = args.missionid
+    subject_id = args.subjectid
+    run_main(agent_id, mission_id, subject_id)

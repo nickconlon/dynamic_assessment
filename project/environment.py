@@ -7,7 +7,7 @@ from project.multiagent_configs import Obstacle
 import logging
 
 class Environment(Env):
-    def __init__(self, _pos_start, _goal, _obstacles=None, _zones=None, _craters=None):
+    def __init__(self, _pos_start, _goal_label, _obstacles=None, _zones=None, _craters=None):
         super(Environment, self).__init__()
         self.minX = 0
         self.maxX = 50
@@ -29,7 +29,8 @@ class Environment(Env):
                         2: np.asarray([0, +1]),
                         3: np.asarray([0, -1])}
         self.goal_eps = 2
-        self.goal = copy.deepcopy(_goal)
+        self.goal = copy.deepcopy(configs.LOCATIONS[_goal_label].position)
+        self.goal_label = _goal_label
         self.pos_start = copy.deepcopy(_pos_start)
         self.pos_home = copy.deepcopy(_pos_start)
         self.pos = copy.deepcopy(self.pos_start)
@@ -106,7 +107,11 @@ class Environment(Env):
 
         _reward = -1 if not self.captured_goal() else +10
         _done = False if not self.captured_goal() else True
-        _info = {'collisions': craters_hit, 'zones': zone_hits, 'times': self.num_steps, 'rewards': _reward}
+        _info = {'collisions': craters_hit,
+                 'zones': zone_hits,
+                 'times': self.num_steps,
+                 'rewards': _reward,
+                 'location': self.goal_label}
         return self.index_from_xy(*self.pos), _reward, _done, _info
 
     def captured_goal(self):
@@ -142,6 +147,7 @@ class Environment(Env):
             self.zones = copy.deepcopy(new_zones)
         if new_goal_label is not None:
             self.goal = copy.deepcopy(configs.LOCATIONS[new_goal_label].position)
+            self.goal_label = new_goal_label
 
     def apply_event(self, event, time):
         """

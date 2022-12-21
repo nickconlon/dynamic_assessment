@@ -1,8 +1,9 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import scipy.stats as stats
+import glob
+import json
+import project.multiagent_configs as configs
+import re
 
-
+'''
 def discrete():
     # fname = 'no_noise_discrete.npy'
     fname = 'noise_discrete.npy'
@@ -81,3 +82,63 @@ def dynamic_time_warping():
 
 
 dynamic_time_warping()
+'''
+
+
+def get_rewards_deliveries(infile):
+    rewards = 0
+    deliveries = 0
+    zones = 0
+    collisions = 0
+    with open(infile) as file:
+        for line in file:
+            line = line.strip()
+            l = re.split('AM | PM ', line)
+            if len(l) == 2:
+                ll = json.loads(l[1])
+                if ll['topic'] == configs.MessageHelpers.TOPICS_STATE_UPDATE:
+                    d = ll['data']
+                    rewards = d[configs.MultiAgentState.STATUS_REWARDS]
+                    deliveries = d[configs.MultiAgentState.STATUS_DELIVERIES]
+                    zones = d[configs.MultiAgentState.STATUS_ZONES]
+                    collisions = d[configs.MultiAgentState.STATUS_CRATERS]
+    return rewards, deliveries, zones, collisions
+
+
+def get_trust(infile):
+    return 'n/a'
+
+
+def get_workload(infile):
+    return 'n/a'
+
+
+def get_data_from_file(infile):
+    metadata = infile.split('.')[0]
+    metadata = metadata.split('_')
+    rewards, deliveries, zones, collisions = get_rewards_deliveries(infile)
+    agent_id = metadata[0]
+    condition_id = metadata[1]
+    subject_id = metadata[2]
+    workload = get_workload('')
+    trust = get_trust('')
+
+    return agent_id, condition_id, subject_id, rewards, deliveries, zones, collisions, workload, trust
+
+
+def convert_to_csv(infiles, outfile):
+    header = 'agent id, condition id, subject id, rewards, deliveries, zones, collisions, workload, trust'
+
+    with open(outfile, 'w') as file:
+        file.write(header + '\n')
+        for infile in infiles:
+            agent_id, condition_id, subject_id, rewards, deliveries, zones, collisions, workload, trust = get_data_from_file(infile)
+            file.write('{},{},{},{},{},{},{},{},{}\n'.format(agent_id, condition_id, subject_id,
+                                                             rewards, deliveries, zones, collisions,
+                                                             workload, trust))
+
+
+fname_logs = glob.glob('*.log')
+# fname_logs = '1_1_1001.log', '2_1_1001.log'
+fname_csv = 'out.csv'
+convert_to_csv(fname_logs, fname_csv)

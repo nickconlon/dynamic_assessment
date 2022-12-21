@@ -6,7 +6,7 @@ import time
 
 import project.solvers.q_learning_policy as policy
 import project.multiagent_configs as configs
-
+from project.assessment.assessments import StaticAssessment, DynamicAssessment
 
 class Agent:
     def __init__(self, agent_id, agent_color, current_location, goal_label, policy_paths, policy_labels,
@@ -18,13 +18,17 @@ class Agent:
         self.current_location = copy.deepcopy(current_location)
         self.goal_label = goal_label
         self.policy = policy.q_policies(policy_paths, policy_labels)
-        self.env = single_agent_environment.Environment(self.current_location, configs.LOCATIONS[goal_label].position,
+        self.env = single_agent_environment.Environment(self.current_location, self.goal_label,
                                                         _obstacles=_obstacles, _zones=_zones, _craters=_craters)
         self.done = False
+        self.static_assessment = StaticAssessment()
+        self.dynamic_assessment = DynamicAssessment()
+        self.zones = 0
+        self.craters = 0
 
-    def event(self, craters_changed=None, zones_changed=None, new_goal_label=None):
-        self.env.change_event(new_craters=craters_changed,
-                              new_zones=zones_changed,
+    def event(self, new_craters=None, new_zones=None, new_goal_label=None):
+        self.env.change_event(new_craters=new_craters,
+                              new_zones=new_zones,
                               new_goal_label=new_goal_label)
 
         if new_goal_label is not None:
@@ -35,6 +39,15 @@ class Agent:
         _state_index, _reward, _done, _info = self.env.step(_action)
         self.current_location = self.env.xy_from_index(_state_index)
         self.done |= _done
+        self.zones += _info['zones']
+        self.craters += _info['collisions']
+
+    def reset(self, location):
+        self.current_location = copy.deepcopy(location)
+        self.done = False
+        self.env.reset(state=location)
+        self.zones = 0
+        self.craters = 0
 
     def is_done(self):
         return self.done
@@ -45,10 +58,21 @@ class Agent:
         s.goal = self.goal_label
         return s.state_update_message()
 
+    def assess(self, goal_label):
+        rewards_oa, collision_oa, zones_oa, predicted_states = self.static_assessment.run_goa_assessment(
+            self.policy.policies[goal_label],
+            copy.deepcopy(self.env),
+            self.current_location,
+            configs.OA_ROLLOUTS,
+            [45, 5, 5],
+            [0, 0, 0],
+            configs.STATE_UNCERTAINTY)
+        return rewards_oa, collision_oa, zones_oa, predicted_states
+
 
 class MultiAgentRendering(single_agent_environment.Environment):
     def __init__(self, agent_ids):
-        super().__init__(configs.LOCATIONS[configs.HOME].position, np.array([0, 0]))
+        super().__init__(configs.LOCATIONS[configs.HOME].position, configs.HOME)
         self.agent_ids = copy.deepcopy(agent_ids)
         self.previous_positions = {}
         self.states = {}
@@ -145,7 +169,7 @@ if __name__ == '__main__':
     a3 = Agent(3, (0, 255, 0), initial_state, configs.AREA_2, available_policies, available_target_names,
                _obstacles=obstacles, _zones=zones, _craters=craters)
 
-    rendering = MultiAgentRendering([1])
+    rendering = MultiAgentRendering([1,2,3])
 
     for i in range(100):
         if i == 20:
