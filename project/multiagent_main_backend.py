@@ -75,7 +75,7 @@ class StateThread(threading.Thread):
 
 
 def run_main(agent_id, mission_id, subject_id):
-    logging.basicConfig(filename='./data/{}_{}_{}_{}.log'.format(agent_id, mission_id, subject_id, time.time()),
+    logging.basicConfig(filename='{}/{}_{}_{}_{}.log'.format(configs.LOGGING_PATH, agent_id, mission_id, subject_id, time.time()),
                         format='%(asctime)s %(message)s',
                         datefmt='%m/%d/%Y %I:%M:%S %p',
                         level=logging.INFO)
@@ -106,8 +106,8 @@ def run_main(agent_id, mission_id, subject_id):
     Setup the environment
     """
     env = Environment(robot_state.location, configs.HOME, _obstacles=[], _zones=[], _craters=[])
-    #env.apply_event(configs.events[0], 1)
-    env.change_event(new_craters=configs.craters1)
+    craters, zones = configs.read_scenarios(configs.SCENARIO_ID)
+    env.change_event(new_craters=craters, new_zones=zones)
 
     """
     Setup the control policies
@@ -151,7 +151,7 @@ def run_main(agent_id, mission_id, subject_id):
         """
         if robot_state.needs_assessment:
             print("Running the assessment!")
-            rewards_oa, collision_oa, zones_oa, predicted_states = assessment.run_goa_assessment(
+            c_oa, c_m, c_std, z_oa, z_m, z_std, predicted_states = assessment.run_goa_assessment_new(
                 policy.policies[robot_state.goal],
                 copy.deepcopy(env),
                 env.xy_from_index(state),
@@ -159,17 +159,22 @@ def run_main(agent_id, mission_id, subject_id):
                 [robot_state.reward_assessment_threshold,
                  robot_state.collision_assessment_threshold,
                  robot_state.zone_assessment_threshold],
-                [robot_state.reward_count,
-                 robot_state.collision_count,
-                 robot_state.zone_count],
+                [0, 0,0],
                 configs.STATE_UNCERTAINTY)
 
-            robot_state.reward_assessment = rewards_oa
-            robot_state.zone_assessment = zones_oa
-            robot_state.collision_assessment = collision_oa
+            robot_state.reward_assessment = 0
+            robot_state.zone_assessment = z_oa
+            robot_state.collision_assessment = c_oa
+
+            robot_state.predicted_collision_count = (np.ceil(c_m), np.ceil(c_std))
+            robot_state.predicted_zone_count = (np.ceil(z_m), np.ceil(z_std))
 
             assessment_index = 1
             robot_state.needs_assessment = False
+            robot_state.assessed_goal = robot_state.goal
+
+            if c_oa <= 0.4:
+                robot_state.movement_state = configs.MultiAgentState.STOP
 
         """
         Navigation states - get the next action
@@ -198,8 +203,9 @@ def run_main(agent_id, mission_id, subject_id):
                 robot_state.movement_state = configs.MultiAgentState.STOP
                 robot_state.at_goal = True
                 if info['location'] != configs.HOME:
-                    robot_state.delivery_count += robot_state.cargo_count
-                    robot_state.cargo_count = max(0, robot_state.cargo_count-1)
+                    if robot_state.cargo_count >= 1:
+                        robot_state.delivery_count += 1
+                        robot_state.cargo_count -= 1
                 elif info['location'] == configs.HOME:
                     robot_state.cargo_count = min(3, robot_state.cargo_count+3)
 
@@ -209,11 +215,18 @@ def run_main(agent_id, mission_id, subject_id):
                     print('assessing due to lack of data')
                     needs_assessment = True
                 else:
-                    predicted_state_t = copy.deepcopy(predicted_states[:, assessment_index])
-                    predicted_state_t = predicted_state_t[~np.isnan(predicted_state_t).any(axis=1), :]
                     try:
+                        predicted_state_t = copy.deepcopy(predicted_states[:, assessment_index])
+                        predicted_state_t = predicted_state_t[~np.isnan(predicted_state_t).any(axis=1), :]
                         p_expected = dynamics.tail(predicted_state_t, env.xy_from_index(state))
                         print("tail: {:.2f}".format(p_expected))
+                    except Exception as e:
+                        p_expected = 0.0
+                        print(e)
+                        traceback.print_exc()
+                    try:
+                        # TODO map changes SI
+                        pass
                     except Exception as e:
                         p_expected = 0.0
                         print(e)
@@ -256,12 +269,14 @@ def run_main(agent_id, mission_id, subject_id):
 
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser(prog='test', description='')
     parser.add_argument('-a', '--agentid', required=True, type=int)
-    parser.add_argument('-m', '--missionid', required=True, type=int)
-    parser.add_argument('-s', '--subjectid', required=True, type=int)
+    #parser.add_argument('-m', '--missionid', required=True, type=int)
+    #parser.add_argument('-s', '--subjectid', required=True, type=int)
     args = parser.parse_args()
+
     agent_id = args.agentid
-    mission_id = args.missionid
-    subject_id = args.subjectid
+    mission_id = 1#args.missionid
+    subject_id = 1#args.subjectid
     run_main(agent_id, mission_id, subject_id)

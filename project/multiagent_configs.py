@@ -23,6 +23,13 @@ CONTROL_PORT = '5554'
 ENABLE_ET_GOA = True
 ENABLE_GOA = True
 
+LOGGING_PATH = './data/logs'
+SCENARIO_PATH = './data/scenarios'
+
+CARGO_RESUPPLY = 3
+
+SCENARIO_ID = 1
+
 #
 # Agent IDs
 #
@@ -103,13 +110,16 @@ class MultiAgentState:
     STATUS_GOAL = 'STATUS_GOAL'
     STATUS_DELIVERIES = 'STATUS_DELIVERIES'
     STATUS_CARGO_COUNT = 'STATUS_CARGO_COUNT'
+    STATUS_ASSESSED_GOAL = 'STATUS_ASSESSED_GOAL'
     STATUS_REWARDS = 'STATUS_REWARDS'
     STATUS_ZONES = 'STATUS_ZONES'
+    STATUS_PREDICTED_ZONES = 'STATUS_PREDICTED_ZONES'
     STATUS_CRATERS = 'STATUS_CRATERS'
+    STATUS_PREDICTED_CRATERS = 'STATUS_PREDICTED_CRATERS'
     STATUS_COLOR = 'STATUS_COLOR'
     STATUS_REWARD_GOA = 'STATUS_REWARD_GOA'
     STATUS_COLLISIONS_GOA = 'STATUS_COLLISIONS_GOA'
-    STATUS_TIME_GOA = 'STATUS_TIME_GOA'
+    STATUS_ZONES_GOA = 'STATUS_TIME_GOA'
 
     # constant state enums
     STOP = 'STOP'
@@ -130,7 +140,9 @@ class MultiAgentState:
         self.needs_end_sim = False
         self.at_goal = True
         self.delivery_count = 0
-        self.cargo_count = 0
+        self.cargo_count = CARGO_RESUPPLY
+
+        self.assessed_goal = HOME
 
         self.reward_assessment_threshold = 0
         self.reward_assessment = 1  # String
@@ -139,10 +151,12 @@ class MultiAgentState:
         self.collision_assessment_threshold = 0  # String
         self.collision_assessment = 1  # String
         self.collision_count = 0  # Integer
+        self.predicted_collision_count = (0, 0)
 
         self.zone_assessment_threshold = 0  # String
         self.zone_assessment = 1  # String
         self.zone_count = 0
+        self.predicted_zone_count = (0, 0)
 
     def state_update_message(self):
         single_agent_msg = {self.STATUS_AGENTID: self.agent_id,
@@ -152,12 +166,15 @@ class MultiAgentState:
                             self.STATUS_GOAL: self.goal,
                             self.STATUS_SIM_TIME: self.sim_current_time,
                             self.STATUS_REWARDS: self.reward_count,
+                            self.STATUS_ASSESSED_GOAL: self.assessed_goal,
                             self.STATUS_ZONES: self.zone_count,
+                            self.STATUS_PREDICTED_ZONES: self.predicted_zone_count,
                             self.STATUS_CRATERS: self.collision_count,
+                            self.STATUS_PREDICTED_CRATERS: self.predicted_collision_count,
                             self.STATUS_COLOR: self.color,
                             self.STATUS_REWARD_GOA: convert_famsec(self.reward_assessment),
                             self.STATUS_COLLISIONS_GOA: convert_famsec(self.collision_assessment),
-                            self.STATUS_TIME_GOA: convert_famsec(self.zone_assessment),
+                            self.STATUS_ZONES_GOA: convert_famsec(self.zone_assessment),
                             self.STATUS_DELIVERIES: self.delivery_count,
                             self.STATUS_CARGO_COUNT: self.cargo_count}
         return single_agent_msg
@@ -268,14 +285,40 @@ class Event:
 def create_new_craters():
     lx = np.random.randint(10, 50)
     ly = np.random.randint(10, 50)
-    sx = np.random.randint(2, 10)
-    sy = np.random.randint(2, 10)
-    craters = [Obstacle(int(x), int(y), 2, CRATER_COLOR) for (x, y) in
-               zip(np.random.normal(loc=lx, scale=sx, size=100), np.random.normal(loc=ly, scale=sy, size=100))]
-    return craters
+    sx = np.random.randint(2, 4)
+    sy = np.random.randint(2, 4)
+    craters = [Obstacle(int(x), int(y), 1, CRATER_COLOR) for (x, y) in
+               zip(np.random.normal(loc=lx, scale=sx, size=25), np.random.normal(loc=ly, scale=sy, size=25))]
 
-zones1 = [Obstacle(int(x), int(y), 1, CRATER_COLOR) for (x, y) in
-          zip(np.random.normal(loc=25, scale=5, size=100), np.random.normal(loc=25, scale=5, size=100))]
+    sx = sx+3
+    sy = sx+3
+    zones = [Obstacle(int(x), int(y), 2, ZONE_COLOR) for (x, y) in
+               zip(np.random.normal(loc=lx, scale=sx, size=25), np.random.normal(loc=ly, scale=sy, size=25))]
+    return craters, zones
 
-craters1 = create_new_craters()
-events = [Event(event_time=1, changed_craters=craters1)]
+
+def save_scenarios(num_runs):
+    for i in range(num_runs):
+        craters, zones = create_new_craters()
+        craters_out = np.zeros((len(craters), 3))
+        zones_out = np.zeros((len(zones), 3))
+        for c in range(len(craters)):
+            craters_out[c] = [*craters[c].xy, craters[c].r]
+        for z in range(len(zones)):
+            zones_out[z] = [*zones[z].xy, zones[z].r]
+        np.save('./data/scenarios/craters_scenario_{}.npy'.format(i), craters_out)
+        np.save('./data/scenarios/zones_scenario_{}.npy'.format(i), zones_out)
+
+
+def read_scenarios(scenario_id):
+    c1, z1 = read_scenario(scenario_id)
+    c2, z2 = read_scenario(scenario_id+1)
+    return c1+c2, z1+z2
+
+
+def read_scenario(scenario_id):
+    c = np.load('./data/scenarios/craters_scenario_{}.npy'.format(scenario_id))
+    z = np.load('./data/scenarios/zones_scenario_{}.npy'.format(scenario_id))
+    craters = [Obstacle(int(x), int(y), int(r), CRATER_COLOR) for (x, y, r) in c]
+    zones = [Obstacle(int(x), int(y), int(r), ZONE_COLOR) for (x, y, r) in z]
+    return craters, zones

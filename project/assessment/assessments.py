@@ -55,6 +55,16 @@ class StaticAssessment(CompetencyAssessmentBase):
         oa = self.famsec.outcome_assessment(reward_dist=rewards, r_star=z_star)
         return oa, rewards, collisions, times, states
 
+    def run_goa_assessment_new(self, policy, env, state, num_rollouts, z_stars, current_counts, transition_uncertainty):
+        rewards, collisions, zones, states, times = self.rollout(policy, env, state, num_rollouts, transition_uncertainty)
+
+        collisions_oa = self.famsec.outcome_assessment(reward_dist=current_counts[1]+collisions, r_star=z_stars[1], swap=True)
+        collisions_oa = np.around(collisions_oa, decimals=2)
+
+        zones_oa = self.famsec.outcome_assessment(reward_dist=current_counts[2]+zones, r_star=z_stars[2], swap=True)
+        zones_oa = np.around(zones_oa, decimals=2)
+        return collisions_oa, np.mean(collisions), np.std(collisions), zones_oa, np.mean(zones), np.std(zones), states
+
     def run_goa_assessment(self, policy, env, state, num_rollouts, z_stars, current_counts, transition_uncertainty) -> object:
         rewards, collisions, zones, states, times = self.rollout(policy, env, state, num_rollouts, transition_uncertainty)
 

@@ -69,6 +69,14 @@ class Agent:
             configs.STATE_UNCERTAINTY)
         return rewards_oa, collision_oa, zones_oa, predicted_states
 
+    def rollout(self, goal_label):
+        rewards, collisions, zones, states, times = self.static_assessment.rollout(
+            self.policy.policies[goal_label],
+            copy.deepcopy(self.env),
+            self.current_location,
+            25, 0.9)
+        return collisions, zones
+
 
 class MultiAgentRendering(single_agent_environment.Environment):
     def __init__(self, agent_ids):

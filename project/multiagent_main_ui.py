@@ -5,9 +5,10 @@ import PyQt5.QtCore as QtCore
 import sys
 import qdarktheme
 import traceback
+import numpy as np
 
 sys.path.append('../')
-import project.ui_multi_agent as ui
+import project.ui_multi_agent_distractor as ui
 import project.communications.zmq_subscriber as subscriber
 from project.communications.zmq_publisher import ZmqPublisher
 import project.multiagent_configs as configs
@@ -37,7 +38,9 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             """
             import multi_agent_environment as rendering
             self.renderer = rendering.MultiAgentRendering([configs.AGENT1_ID, configs.AGENT2_ID])
-            self.renderer.change_event(new_craters=configs.craters1)
+            craters, zones = configs.read_scenarios(configs.SCENARIO_ID)
+            self.renderer.change_event(new_craters=craters, new_zones=zones)
+            self.render_map(self.renderer.render(mode="rgb_array"))
 
             """
             Setup the control buttons
@@ -69,10 +72,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             """
             Setup the assessment listener thread
             """
-            self.outcome_assessment_slider_rewards.valueChanged.connect(self.self_assessment_value_update)
-            self.outcome_assessment_slider_zones.valueChanged.connect(self.outcome_assessment_slider_2_update)
-            self.outcome_assessment_slider_craters.valueChanged.connect(self.outcome_assessment_slider_3_update)
-            self.assess_button.clicked.connect(self.self_assessment_button_click)
+            self.assessment_button.clicked.connect(self.self_assessment_button_click)
             self.thread = QtCore.QThread()
             QtCore.QTimer.singleShot(0, self.thread.start)
 
@@ -85,6 +85,19 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.stateThread.started.connect(self.zeromq_state_listener.loop)
             self.zeromq_state_listener.message.connect(self.state_update)
             QtCore.QTimer.singleShot(0, self.stateThread.start)
+
+            """
+            Setup the confidence alert stuff
+            """
+            self.operator_alert_slider.valueChanged.connect(self.alert_slider_update)
+
+            """
+            Setup the distraction task stuff
+            """
+            self.report_button.clicked.connect(self.send_report)
+            self.report_slider.valueChanged.connect(self.report_slider_update)
+            QtCore.QTimer.singleShot(5000, self.alert_report)
+
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -115,7 +128,10 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
 
             assessment_msg = {'rewards': m[configs.MultiAgentState.STATUS_REWARD_GOA],
                               'collisions': m[configs.MultiAgentState.STATUS_COLLISIONS_GOA],
-                              'zones': m[configs.MultiAgentState.STATUS_TIME_GOA]}
+                              'zones': m[configs.MultiAgentState.STATUS_ZONES_GOA],
+                              'predicted_craters': m[configs.MultiAgentState.STATUS_PREDICTED_CRATERS],
+                              'predicted_zones': m[configs.MultiAgentState.STATUS_PREDICTED_ZONES],
+                              'target': m[configs.MultiAgentState.STATUS_ASSESSED_GOAL]}
             self.agent1_assessment_update(assessment_msg)
         except Exception as e:
             print(e)
@@ -128,6 +144,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.robot2_location.setText(str(m[configs.MultiAgentState.STATUS_LOCATION]))
             self.robot2_craters.setText(str(m[configs.MultiAgentState.STATUS_HITS]))
             self.robot2_zones.setText(str(m[configs.MultiAgentState.STATUS_ZONES]))
+            self.robot2_cargo.setText(str(m[configs.MultiAgentState.STATUS_CARGO_COUNT]))
             self.clear_area_buttons(configs.AGENT2_ID)
             if m[configs.MultiAgentState.STATUS_GOAL] == configs.HOME:
                 self.robot2_goHomeButton.setStyleSheet("background-color: green")
@@ -146,7 +163,10 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
 
             assessment_msg = {'rewards': m[configs.MultiAgentState.STATUS_REWARD_GOA],
                               'collisions': m[configs.MultiAgentState.STATUS_COLLISIONS_GOA],
-                              'times': m[configs.MultiAgentState.STATUS_TIME_GOA]}
+                              'zones': m[configs.MultiAgentState.STATUS_ZONES_GOA],
+                              'predicted_craters': m[configs.MultiAgentState.STATUS_PREDICTED_CRATERS],
+                              'predicted_zones': m[configs.MultiAgentState.STATUS_PREDICTED_ZONES],
+                              'target': m[configs.MultiAgentState.STATUS_ASSESSED_GOAL]}
             self.agent2_assessment_update(assessment_msg)
         except Exception as e:
             print(e)
@@ -322,22 +342,12 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
     #
     # Self-assessment stuff
     #
-    def self_assessment_value_update(self, value):
-        self.acceptable_reward_value.setText(str(value))
-
-    def outcome_assessment_slider_2_update(self, value):
-        self.outcome_threshold_value_2.setText(str(value))
-
-    def outcome_assessment_slider_3_update(self, value):
-        self.outcome_threshold_value_3.setText(str(value))
-
     def self_assessment_button_click(self):
-        self.assess_button.setStyleSheet("background-color: green")
-        oa_rewards = self.outcome_assessment_slider_rewards.value()
-        oa_zones = self.outcome_assessment_slider_zones.value()
-        oa_hits = self.outcome_assessment_slider_craters.value()
+        self.assessment_button.setStyleSheet("background-color: green")
+        oa_zones = 5#self.outcome_assessment_slider_zones.value()
+        oa_hits = 5#self.outcome_assessment_slider_craters.value()
         for agent_id in [configs.AGENT1_ID, configs.AGENT2_ID]:
-            _msg = configs.MessageHelpers.assessment_request(agent_id, oa_rewards, oa_zones, oa_hits)
+            _msg = configs.MessageHelpers.assessment_request(agent_id, 0, oa_zones, oa_hits)
             print(_msg)
             self.controlpub.publish(_msg)
 
@@ -345,18 +355,18 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
         """ Update the assessment display for agent 1 """
         try:
             print(msg)
-            rewards = msg['rewards']
+            target_goal = msg['target']
             collisions = msg['collisions']
-            times = msg['zones']
-            self.robot1_oa_rewards_value.setText(str(rewards))
-            self.robot1_oa_rewards_value.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[rewards]))
+            zones = msg['zones']
+            predicted_craters = msg['predicted_craters']
+            predicted_zones = msg['predicted_zones']
 
-            self.robot1_oa_zones_value.setText(str(times))
-            self.robot1_oa_zones_value.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[times]))
+            likelihood_string = 'Likelihood of successful navigation to {}:'.format(target_goal)
+            self.robot1_likelihood_label.setText(likelihood_string)
+            self.robot1_delivery_assessment_value.setText(str(collisions))
+            self.robot1_crater_assessment_value.setText(str(predicted_craters[0]) + u' \u00B1 '+str(predicted_craters[1]))
+            self.robot1_zone_assessment_value.setText(str(predicted_zones[0]) + u' \u00B1 '+str(predicted_zones[1]))
 
-            self.robot1_oa_hits_value.setText(str(collisions))
-            self.robot1_oa_hits_value.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[collisions]))
-            self.assess_button.setStyleSheet("background-color: none")
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -365,19 +375,17 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
         """ Update the assessment display for agent 2 """
         try:
             print(msg)
-            rewards = msg['rewards']
+            target_goal = msg['target']
             collisions = msg['collisions']
-            times = msg['times']
+            zones = msg['zones']
+            predicted_craters = msg['predicted_craters']
+            predicted_zones = msg['predicted_zones']
 
-            self.robot2_oa_rewards_value.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[rewards]))
-            self.robot2_oa_rewards_value.setText(str(times))
-
-            self.robot2_oa_zones_value.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[times]))
-            self.robot2_oa_zones_value.setText(str(times))
-
-            self.robot2_oa_hits_value.setStyleSheet("background-color: {}".format(configs.FAMSEC_COLORS[collisions]))
-            self.robot2_oa_hits_value.setText(str(collisions))
-            self.assess_button.setStyleSheet("background-color: none")
+            likelihood_string = 'Likelihood of successful navigation to {}:'.format(target_goal)
+            self.robot2_likelihood_label.setText(likelihood_string)
+            self.robot2_delivery_assessment_value.setText(str(collisions))
+            self.robot2_crater_assessment_value.setText(str(predicted_craters[0]) + u' \u00B1 '+str(predicted_craters[1]))
+            self.robot2_zone_assessment_value.setText(str(predicted_zones[0]) + u' \u00B1 '+str(predicted_zones[1]))
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -387,6 +395,23 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
         pixmap = QPixmap.fromImage(image)
         self.map_area.setPixmap(pixmap)
         self.map_area.setScaledContents(True)
+
+    def alert_slider_update(self, value):
+        oa = configs.convert_famsec(float(value)/100.)
+        self.outcome_threshold_value_4.setText(oa)
+
+    def report_slider_update(self, value):
+        self.report_slider_value.setText(str(value))
+
+    def alert_report(self):
+        self.report_button.setStyleSheet("background-color: {}".format('red'))
+        self.report_slider_counter.setText(str(np.random.randint(0, 100)))
+
+    def send_report(self):
+        if self.report_slider_value.text() == self.report_slider_counter.text():
+            self.report_button.setStyleSheet("background-color: {}".format('none'))
+            QtCore.QTimer.singleShot(5000, self.alert_report)
+            self.report_slider_counter.setText('-')
 
 
 qdarktheme.enable_hi_dpi()
