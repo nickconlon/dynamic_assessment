@@ -46,7 +46,7 @@ class Environment(Env):
         self.path_color = (107, 183, 189)
         self.goal_color = (0, 255, 0)
         self.agent_color = (255, 255, 255)
-        self.home_color = (255, 0, 0)
+        self.home_color = (0, 255, 0)
 
         self.stochastic_transitions = False
         self.transition_probability = 0.9

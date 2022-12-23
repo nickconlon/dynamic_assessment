@@ -28,14 +28,22 @@ SCENARIO_PATH = './data/scenarios'
 
 CARGO_RESUPPLY = 3
 
-SCENARIO_ID = 1
+SCENARIO_ID = 2
 
 #
-# Agent IDs
+# Agent IDs and colors
 #
+
 AGENT1_ID = 1
+AGENT1_COLOR = (0, 102, 255)
 AGENT2_ID = 2
+AGENT2_COLOR = (255, 204, 0)  # light blue
 AGENT3_ID = 3
+AGENT3_COLOR = (0, 255, 0)
+
+AGENT_COLOR = {AGENT1_ID: AGENT1_COLOR,
+               AGENT2_ID: AGENT2_COLOR,
+               AGENT3_ID: AGENT3_COLOR}
 
 #
 # Initial environment and state

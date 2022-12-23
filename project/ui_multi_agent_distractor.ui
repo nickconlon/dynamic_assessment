@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1768</width>
-    <height>675</height>
+    <width>1542</width>
+    <height>655</height>
    </rect>
   </property>
   <property name="font">
@@ -24,8 +24,8 @@
      <rect>
       <x>580</x>
       <y>10</y>
-      <width>471</width>
-      <height>511</height>
+      <width>551</width>
+      <height>491</height>
      </rect>
     </property>
     <property name="frameShape">
@@ -82,8 +82,8 @@
     <widget class="QLabel" name="task_assessment_label_2">
      <property name="geometry">
       <rect>
-       <x>20</x>
-       <y>170</y>
+       <x>100</x>
+       <y>130</y>
        <width>201</width>
        <height>41</height>
       </rect>
@@ -106,8 +106,8 @@
     <widget class="QLabel" name="task_assessment_label_3">
      <property name="geometry">
       <rect>
-       <x>230</x>
-       <y>170</y>
+       <x>310</x>
+       <y>130</y>
        <width>221</width>
        <height>41</height>
       </rect>
@@ -131,8 +131,8 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>360</y>
-       <width>451</width>
+       <y>320</y>
+       <width>531</width>
        <height>141</height>
       </rect>
      </property>
@@ -145,7 +145,7 @@
      <widget class="QFrame" name="frame_13">
       <property name="geometry">
        <rect>
-        <x>10</x>
+        <x>90</x>
         <y>10</y>
         <width>201</width>
         <height>121</height>
@@ -377,7 +377,7 @@
      <widget class="QFrame" name="frame_14">
       <property name="geometry">
        <rect>
-        <x>220</x>
+        <x>300</x>
         <y>10</y>
         <width>221</width>
         <height>121</height>
@@ -508,13 +508,32 @@
        </property>
       </widget>
      </widget>
+     <widget class="QFrame" name="robot2_color_frame">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>10</y>
+        <width>71</width>
+        <height>121</height>
+       </rect>
+      </property>
+      <property name="styleSheet">
+       <string notr="true"/>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::StyledPanel</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Plain</enum>
+      </property>
+     </widget>
     </widget>
     <widget class="QFrame" name="agent1_frame">
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>210</y>
-       <width>451</width>
+       <y>170</y>
+       <width>531</width>
        <height>141</height>
       </rect>
      </property>
@@ -533,7 +552,7 @@
      <widget class="QFrame" name="frame">
       <property name="geometry">
        <rect>
-        <x>10</x>
+        <x>90</x>
         <y>10</y>
         <width>201</width>
         <height>121</height>
@@ -768,7 +787,7 @@
      <widget class="QFrame" name="frame_8">
       <property name="geometry">
        <rect>
-        <x>220</x>
+        <x>300</x>
         <y>10</y>
         <width>221</width>
         <height>121</height>
@@ -899,6 +918,25 @@
        </property>
       </widget>
      </widget>
+     <widget class="QFrame" name="robot1_color_frame">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>10</y>
+        <width>71</width>
+        <height>121</height>
+       </rect>
+      </property>
+      <property name="styleSheet">
+       <string notr="true"/>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::StyledPanel</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Plain</enum>
+      </property>
+     </widget>
     </widget>
     <widget class="QLabel" name="delivery_description_label">
      <property name="geometry">
@@ -942,6 +980,30 @@
       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
      </property>
     </widget>
+    <widget class="QLabel" name="task_assessment_label_4">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>130</y>
+       <width>91</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>18</pointsize>
+       <weight>75</weight>
+       <bold>true</bold>
+       <underline>true</underline>
+      </font>
+     </property>
+     <property name="text">
+      <string>Color</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
    </widget>
    <widget class="QFrame" name="frame_3">
     <property name="geometry">
@@ -949,7 +1011,7 @@
       <x>20</x>
       <y>440</y>
       <width>551</width>
-      <height>81</height>
+      <height>61</height>
      </rect>
     </property>
     <property name="autoFillBackground">
@@ -964,42 +1026,23 @@
     <property name="lineWidth">
      <number>4</number>
     </property>
-    <widget class="QFrame" name="frame_9">
+    <widget class="QPushButton" name="stopSimButton">
      <property name="geometry">
       <rect>
        <x>90</x>
        <y>10</y>
-       <width>391</width>
-       <height>61</height>
+       <width>351</width>
+       <height>41</height>
       </rect>
      </property>
-     <property name="frameShape">
-      <enum>QFrame::StyledPanel</enum>
+     <property name="font">
+      <font>
+       <pointsize>18</pointsize>
+      </font>
      </property>
-     <property name="frameShadow">
-      <enum>QFrame::Plain</enum>
+     <property name="text">
+      <string>Stop Simulation</string>
      </property>
-     <property name="lineWidth">
-      <number>4</number>
-     </property>
-     <widget class="QPushButton" name="stopSimButton">
-      <property name="geometry">
-       <rect>
-        <x>20</x>
-        <y>10</y>
-        <width>351</width>
-        <height>41</height>
-       </rect>
-      </property>
-      <property name="font">
-       <font>
-        <pointsize>18</pointsize>
-       </font>
-      </property>
-      <property name="text">
-       <string>Stop Simulation</string>
-      </property>
-     </widget>
     </widget>
    </widget>
    <widget class="QFrame" name="frame_5">
@@ -1035,7 +1078,7 @@
     <property name="geometry">
      <rect>
       <x>20</x>
-      <y>530</y>
+      <y>510</y>
       <width>1031</width>
       <height>101</height>
      </rect>
@@ -1132,10 +1175,10 @@
    <widget class="QFrame" name="frame_6">
     <property name="geometry">
      <rect>
-      <x>1060</x>
+      <x>1140</x>
       <y>10</y>
-      <width>421</width>
-      <height>511</height>
+      <width>381</width>
+      <height>491</height>
      </rect>
     </property>
     <property name="frameShape">
@@ -1148,8 +1191,8 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>370</y>
-       <width>401</width>
+       <y>330</y>
+       <width>361</width>
        <height>121</height>
       </rect>
      </property>
@@ -1157,7 +1200,7 @@
       <enum>QFrame::StyledPanel</enum>
      </property>
      <property name="frameShadow">
-      <enum>QFrame::Raised</enum>
+      <enum>QFrame::Plain</enum>
      </property>
      <widget class="QLabel" name="label_11">
       <property name="geometry">
@@ -1182,7 +1225,7 @@
        <rect>
         <x>10</x>
         <y>30</y>
-        <width>271</width>
+        <width>351</width>
         <height>21</height>
        </rect>
       </property>
@@ -1192,34 +1235,7 @@
        </font>
       </property>
       <property name="text">
-       <string>Likelihood of successful navigation to - :</string>
-      </property>
-     </widget>
-     <widget class="QLabel" name="robot2_delivery_assessment_value">
-      <property name="geometry">
-       <rect>
-        <x>280</x>
-        <y>30</y>
-        <width>111</width>
-        <height>21</height>
-       </rect>
-      </property>
-      <property name="font">
-       <font>
-        <pointsize>10</pointsize>
-       </font>
-      </property>
-      <property name="text">
-       <string>-</string>
-      </property>
-      <property name="textFormat">
-       <enum>Qt::AutoText</enum>
-      </property>
-      <property name="scaledContents">
-       <bool>false</bool>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+       <string>Likelihood of successful navigation to - : - </string>
       </property>
      </widget>
      <widget class="QLabel" name="label_13">
@@ -1323,9 +1339,9 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>120</y>
-       <width>401</width>
-       <height>91</height>
+       <y>90</y>
+       <width>361</width>
+       <height>81</height>
       </rect>
      </property>
      <property name="frameShape">
@@ -1338,8 +1354,8 @@
       <property name="geometry">
        <rect>
         <x>10</x>
-        <y>60</y>
-        <width>381</width>
+        <y>50</y>
+        <width>341</width>
         <height>22</height>
        </rect>
       </property>
@@ -1400,7 +1416,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>401</width>
+        <width>361</width>
         <height>31</height>
        </rect>
       </property>
@@ -1410,7 +1426,7 @@
        </font>
       </property>
       <property name="text">
-       <string>Alert the operator when confidence is below:</string>
+       <string>Alert when rove confidence is below:</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
@@ -1420,9 +1436,9 @@
     <widget class="QLabel" name="task_assessment_label">
      <property name="geometry">
       <rect>
-       <x>10</x>
-       <y>10</y>
-       <width>401</width>
+       <x>0</x>
+       <y>0</y>
+       <width>381</width>
        <height>41</height>
       </rect>
      </property>
@@ -1445,8 +1461,8 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>220</y>
-       <width>401</width>
+       <y>180</y>
+       <width>361</width>
        <height>121</height>
       </rect>
      </property>
@@ -1454,7 +1470,7 @@
       <enum>QFrame::StyledPanel</enum>
      </property>
      <property name="frameShadow">
-      <enum>QFrame::Raised</enum>
+      <enum>QFrame::Plain</enum>
      </property>
      <widget class="QLabel" name="label">
       <property name="geometry">
@@ -1479,7 +1495,7 @@
        <rect>
         <x>10</x>
         <y>30</y>
-        <width>271</width>
+        <width>351</width>
         <height>21</height>
        </rect>
       </property>
@@ -1489,34 +1505,7 @@
        </font>
       </property>
       <property name="text">
-       <string>Likelihood of successful navigation to - :</string>
-      </property>
-     </widget>
-     <widget class="QLabel" name="robot1_delivery_assessment_value">
-      <property name="geometry">
-       <rect>
-        <x>280</x>
-        <y>30</y>
-        <width>111</width>
-        <height>21</height>
-       </rect>
-      </property>
-      <property name="font">
-       <font>
-        <pointsize>10</pointsize>
-       </font>
-      </property>
-      <property name="text">
-       <string>-</string>
-      </property>
-      <property name="textFormat">
-       <enum>Qt::AutoText</enum>
-      </property>
-      <property name="scaledContents">
-       <bool>false</bool>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+       <string>Likelihood of successful navigation to - : - </string>
       </property>
      </widget>
      <widget class="QLabel" name="label_4">
@@ -1619,8 +1608,8 @@
     <widget class="QPushButton" name="assessment_button">
      <property name="geometry">
       <rect>
-       <x>110</x>
-       <y>60</y>
+       <x>90</x>
+       <y>40</y>
        <width>201</width>
        <height>41</height>
       </rect>
@@ -1643,7 +1632,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1768</width>
+     <width>1542</width>
      <height>21</height>
     </rect>
    </property>

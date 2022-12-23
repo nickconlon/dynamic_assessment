@@ -90,7 +90,7 @@ def run_main(agent_id, mission_id, subject_id):
     """
     Initialize the application state machine
     """
-    robot_state = configs.MultiAgentState(agent_id, time.time(), 'red')
+    robot_state = configs.MultiAgentState(agent_id, time.time(), configs.AGENT_COLOR[agent_id])
     robot_state.location = configs.LOCATIONS[configs.HOME].position
     robot_state.goal = configs.LOCATIONS[configs.HOME].name
     """

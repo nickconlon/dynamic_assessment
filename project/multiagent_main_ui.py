@@ -104,12 +104,12 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
 
     def state_update_robot1(self, m):
         try:
-            print(m[configs.MultiAgentState.STATUS_LOCATION])
-            print(str(m[configs.MultiAgentState.STATUS_LOCATION]))
             self.robot_location.setText(str(m[configs.MultiAgentState.STATUS_LOCATION]))
             self.robot_craters.setText(str(m[configs.MultiAgentState.STATUS_HITS]))
             self.robot_zones.setText(str(m[configs.MultiAgentState.STATUS_ZONES]))
             self.robot1_cargo.setText(str(m[configs.MultiAgentState.STATUS_CARGO_COUNT]))
+            color_string = "background-color: rgb({},{},{})".format(*m[configs.MultiAgentState.STATUS_COLOR])
+            self.robot1_color_frame.setStyleSheet(color_string)
             self.clear_area_buttons(1)
             if m[configs.MultiAgentState.STATUS_GOAL] == configs.HOME:
                 self.goHomeButton.setStyleSheet("background-color: green")
@@ -139,12 +139,12 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
 
     def state_update_robot2(self, m):
         try:
-            print(m[configs.MultiAgentState.STATUS_LOCATION])
-            print(str(m[configs.MultiAgentState.STATUS_LOCATION]))
             self.robot2_location.setText(str(m[configs.MultiAgentState.STATUS_LOCATION]))
             self.robot2_craters.setText(str(m[configs.MultiAgentState.STATUS_HITS]))
             self.robot2_zones.setText(str(m[configs.MultiAgentState.STATUS_ZONES]))
             self.robot2_cargo.setText(str(m[configs.MultiAgentState.STATUS_CARGO_COUNT]))
+            color_string = "background-color: rgb({},{},{})".format(*m[configs.MultiAgentState.STATUS_COLOR])
+            self.robot2_color_frame.setStyleSheet(color_string)
             self.clear_area_buttons(configs.AGENT2_ID)
             if m[configs.MultiAgentState.STATUS_GOAL] == configs.HOME:
                 self.robot2_goHomeButton.setStyleSheet("background-color: green")
@@ -214,7 +214,6 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.goHomeButton.setStyleSheet("background-color: green")
             _msg = configs.MessageHelpers.goal_request(configs.AGENT1_ID, configs.HOME)
             self.controlpub.publish(_msg)
-            print('home')
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -225,7 +224,6 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.goArea1Button.setStyleSheet("background-color: green")
             _msg = configs.MessageHelpers.goal_request(configs.AGENT1_ID, configs.AREA_1)
             self.controlpub.publish(_msg)
-            print('area1')
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -236,7 +234,6 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.goArea2Button.setStyleSheet("background-color: green")
             _msg = configs.MessageHelpers.goal_request(configs.AGENT1_ID, configs.AREA_2)
             self.controlpub.publish(_msg)
-            print('area2')
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -247,7 +244,6 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.goArea3Button.setStyleSheet("background-color: green")
             _msg = configs.MessageHelpers.goal_request(configs.AGENT1_ID, configs.AREA_3)
             self.controlpub.publish(_msg)
-            print('area3')
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -258,7 +254,6 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.robot2_goHomeButton.setStyleSheet("background-color: green")
             _msg = configs.MessageHelpers.goal_request(configs.AGENT2_ID, configs.HOME)
             self.controlpub.publish(_msg)
-            print('home')
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -269,7 +264,6 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.robot2_goArea1Button.setStyleSheet("background-color: green")
             _msg = configs.MessageHelpers.goal_request(configs.AGENT2_ID, configs.AREA_1)
             self.controlpub.publish(_msg)
-            print('area1')
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -280,7 +274,6 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.robot2_goArea2Button.setStyleSheet("background-color: green")
             _msg = configs.MessageHelpers.goal_request(configs.AGENT2_ID, configs.AREA_2)
             self.controlpub.publish(_msg)
-            print('area2')
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -291,7 +284,6 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.robot2_goArea3Button.setStyleSheet("background-color: green")
             _msg = configs.MessageHelpers.goal_request(configs.AGENT2_ID, configs.AREA_3)
             self.controlpub.publish(_msg)
-            print('area3')
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -302,7 +294,6 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             _msg = configs.MessageHelpers.end_sim()
             self.controlpub.publish(_msg)
             self.renderer.reset()
-            print('stop')
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -361,9 +352,8 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             predicted_craters = msg['predicted_craters']
             predicted_zones = msg['predicted_zones']
 
-            likelihood_string = 'Likelihood of successful navigation to {}:'.format(target_goal)
+            likelihood_string = 'Likelihood of successful navigation to {}: {}'.format(target_goal, str(collisions))
             self.robot1_likelihood_label.setText(likelihood_string)
-            self.robot1_delivery_assessment_value.setText(str(collisions))
             self.robot1_crater_assessment_value.setText(str(predicted_craters[0]) + u' \u00B1 '+str(predicted_craters[1]))
             self.robot1_zone_assessment_value.setText(str(predicted_zones[0]) + u' \u00B1 '+str(predicted_zones[1]))
 
@@ -381,9 +371,8 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             predicted_craters = msg['predicted_craters']
             predicted_zones = msg['predicted_zones']
 
-            likelihood_string = 'Likelihood of successful navigation to {}:'.format(target_goal)
+            likelihood_string = 'Likelihood of successful navigation to {}: {}'.format(target_goal, str(collisions))
             self.robot2_likelihood_label.setText(likelihood_string)
-            self.robot2_delivery_assessment_value.setText(str(collisions))
             self.robot2_crater_assessment_value.setText(str(predicted_craters[0]) + u' \u00B1 '+str(predicted_craters[1]))
             self.robot2_zone_assessment_value.setText(str(predicted_zones[0]) + u' \u00B1 '+str(predicted_zones[1]))
         except Exception as e:

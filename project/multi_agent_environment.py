@@ -8,6 +8,7 @@ import project.solvers.q_learning_policy as policy
 import project.multiagent_configs as configs
 from project.assessment.assessments import StaticAssessment, DynamicAssessment
 
+
 class Agent:
     def __init__(self, agent_id, agent_color, current_location, goal_label, policy_paths, policy_labels,
                  _obstacles=None, _zones=None,
@@ -123,8 +124,9 @@ class MultiAgentRendering(single_agent_environment.Environment):
         Render the environment.
         """
         _image = np.copy(self.base_image)
+        _image = cv2.cvtColor(_image, cv2.COLOR_BGR2RGB)
         scale = 10
-        colors = {1: (0, 0, 255), 2: (255, 0, 0), 3: (0, 255, 0)}
+        colors = {1: configs.AGENT1_COLOR, 2: configs.AGENT2_COLOR, 3: configs.AGENT3_COLOR}
 
         _, _, _image = self.add_convex_hull(_image, self.zones, (22, 22, 138))
         _, _, _image = self.add_convex_hull(_image, self.craters, (255, 0, 0))
@@ -145,14 +147,22 @@ class MultiAgentRendering(single_agent_environment.Environment):
                                (self.maxX * scale, self.maxY * scale), (0, 0, 0), thickness=2)
 
         _image = cv2.circle(_image, (self.pos_home[0] * scale, self.pos_home[1] * scale), self.goal_eps * scale,
-                            self.home_color, thickness=2)
+                            self.home_color, thickness=1)
+        _image = cv2.putText(_image, 'H', (self.pos_home[0] * scale - 10, self.pos_home[1] * scale + 10),
+                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
+
+        for g in [configs.AREA_1, configs.AREA_2, configs.AREA_3]:
+            pos = configs.LOCATIONS[g].position
+            _image = cv2.circle(_image, (pos[0] * scale, pos[1] * scale), self.goal_eps * scale,
+                                self.goal_color, thickness=1)
+            _image = cv2.putText(_image, g.split('_')[1], (pos[0] * scale - 10, pos[1] * scale + 10),
+                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
 
         for agent_id in self.agent_ids:
             if agent_id in self.states:
                 agent_state = self.states[agent_id]
                 if agent_state:
                     agent_location = agent_state[configs.MultiAgentState.STATUS_LOCATION]
-                    # agent_color = agent_state[configs.MultiAgentState.STATUS_COLOR]
                     agent_color = colors[agent_id]
                     agent_goal = agent_state[configs.MultiAgentState.STATUS_GOAL]
                     agent_goal = configs.LOCATIONS[agent_goal].position
@@ -166,17 +176,17 @@ class MultiAgentRendering(single_agent_environment.Environment):
                     _image = self.draw_shapes(_image, agent_location, agent_color)
 
                     _image = cv2.circle(_image, (agent_goal[0] * scale, agent_goal[1] * scale), self.goal_eps * scale,
-                                        self.goal_color, thickness=2)
+                                        self.goal_color, thickness=3)
 
         _image = _image[0:600, 0:600, :]
 
         if mode == "human":
             _image = cv2.resize(_image, (500, 500), interpolation=cv2.INTER_AREA)
-            cv2.imshow('test', _image)
+            cv2.imshow('test', cv2.cvtColor(_image, cv2.COLOR_RGB2BGR))
             cv2.waitKey(100)
         elif mode == "rgb_array":
-            _image = cv2.cvtColor(_image, cv2.COLOR_BGR2RGB)
-            return _image
+            #_image = cv2.cvtColor(_image, cv2.COLOR_BGR2RGB)
+            return _image.copy()
 
     def reset(self):
         super().reset()
@@ -190,8 +200,7 @@ if __name__ == '__main__':
 
     initial_state = configs.LOCATIONS[configs.HOME].position
     obstacles = []
-    zones = []
-    craters = []
+    craters, zones = configs.read_scenarios(configs.SCENARIO_ID)
 
     available_policies = [configs.LOCATIONS[configs.HOME].policy,
                           configs.LOCATIONS[configs.AREA_1].policy,
@@ -210,7 +219,8 @@ if __name__ == '__main__':
     a3 = Agent(3, (0, 255, 0), initial_state, configs.AREA_2, available_policies, available_target_names,
                _obstacles=obstacles, _zones=zones, _craters=craters)
 
-    rendering = MultiAgentRendering([1,2,3])
+    rendering = MultiAgentRendering([1, 2, 3])
+    rendering.change_event(new_craters=craters, new_zones=zones)
 
     for i in range(100):
         if i == 20:

@@ -29,6 +29,7 @@ class StaticAssessment(CompetencyAssessmentBase):
         collisions = np.zeros(num_rollouts)
         zones = np.zeros(num_rollouts)
         times = np.zeros(num_rollouts)
+        deliveries = np.zeros(num_rollouts)
 
         predictions = np.zeros((num_rollouts, max_length, 2)) * np.nan
         for i in range(num_rollouts):
@@ -45,6 +46,8 @@ class StaticAssessment(CompetencyAssessmentBase):
                 times[i] += 1
                 rewards[i] += info['rewards']
                 if done:
+                    if collisions[i] < 5:
+                        deliveries += 1
                     break
 
         # np.save('./data/noise_discrete.npy', predictions)
