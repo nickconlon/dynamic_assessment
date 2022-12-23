@@ -91,6 +91,33 @@ class MultiAgentRendering(single_agent_environment.Environment):
         if agent_id in self.states:
             self.states[agent_id] = state_msg
 
+    @staticmethod
+    def add_convex_hull(_image, _obstacles, _color):
+        imgg = np.zeros_like(_image)
+        _img = _image.copy()
+        for obs in _obstacles:
+            imgg = cv2.circle(imgg, (obs.xy[0] * 10, obs.xy[1] * 10), obs.r * 10, obs.color, thickness=2)
+
+        gray = cv2.cvtColor(imgg, cv2.COLOR_BGR2GRAY)
+        kernel_dilation = np.ones((4, 4), np.uint8)
+        gray = cv2.dilate(gray, kernel_dilation, iterations=12)
+        ret, thresh = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY)
+        contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        # create hull array for convex hull points
+        hull = []
+        # calculate points for each contour
+        for i in range(len(contours)):
+            # creating convex hull object for each contour
+            hull.append(cv2.convexHull(contours[i], False))
+
+        for i in range(len(contours)):
+            _img = cv2.drawContours(_img, hull, i, _color, -1)
+
+        alpha = 0.4
+        _img = cv2.addWeighted(_img, alpha, _image, 1 - alpha, 0)
+
+        return hull, contours, _img
+
     def render(self, mode="human"):
         """
         Render the environment.
@@ -98,6 +125,28 @@ class MultiAgentRendering(single_agent_environment.Environment):
         _image = np.copy(self.base_image)
         scale = 10
         colors = {1: (0, 0, 255), 2: (255, 0, 0), 3: (0, 255, 0)}
+
+        _, _, _image = self.add_convex_hull(_image, self.zones, (22, 22, 138))
+        _, _, _image = self.add_convex_hull(_image, self.craters, (255, 0, 0))
+
+        for obstacle in self.obstacles:
+            _image = cv2.circle(_image, (obstacle.xy[0] * scale, obstacle.xy[1] * scale), obstacle.r * scale,
+                                obstacle.color, thickness=2)
+        '''
+        for zone in self.zones:
+            _image = cv2.circle(_image, (zone.xy[0] * scale, zone.xy[1] * scale), zone.r * scale, zone.color,
+                                thickness=2)
+
+        for crater in self.craters:
+            _image = cv2.circle(_image, (crater.xy[0] * scale, crater.xy[1] * scale), crater.r * scale, crater.color,
+                                thickness=2)
+        '''
+        _image = cv2.rectangle(_image, (self.minX * scale, self.minY * scale),
+                               (self.maxX * scale, self.maxY * scale), (0, 0, 0), thickness=2)
+
+        _image = cv2.circle(_image, (self.pos_home[0] * scale, self.pos_home[1] * scale), self.goal_eps * scale,
+                            self.home_color, thickness=2)
+
         for agent_id in self.agent_ids:
             if agent_id in self.states:
                 agent_state = self.states[agent_id]
@@ -119,23 +168,6 @@ class MultiAgentRendering(single_agent_environment.Environment):
                     _image = cv2.circle(_image, (agent_goal[0] * scale, agent_goal[1] * scale), self.goal_eps * scale,
                                         self.goal_color, thickness=2)
 
-        _image = cv2.circle(_image, (self.pos_home[0] * scale, self.pos_home[1] * scale), self.goal_eps * scale,
-                            self.home_color, thickness=2)
-
-        for obstacle in self.obstacles:
-            _image = cv2.circle(_image, (obstacle.xy[0] * scale, obstacle.xy[1] * scale), obstacle.r * scale,
-                                obstacle.color, thickness=2)
-
-        for zone in self.zones:
-            _image = cv2.circle(_image, (zone.xy[0] * scale, zone.xy[1] * scale), zone.r * scale, zone.color,
-                                thickness=2)
-
-        for crater in self.craters:
-            _image = cv2.circle(_image, (crater.xy[0] * scale, crater.xy[1] * scale), crater.r * scale, crater.color,
-                                thickness=2)
-
-        _image = cv2.rectangle(_image, (self.minX * scale, self.minY * scale),
-                               (self.maxX * scale, self.maxY * scale), (0, 0, 0), thickness=2)
         _image = _image[0:600, 0:600, :]
 
         if mode == "human":
@@ -151,6 +183,7 @@ class MultiAgentRendering(single_agent_environment.Environment):
         for agent_id in self.agent_ids:
             self.previous_positions[agent_id] = []
             self.states[agent_id] = {}
+
 
 if __name__ == '__main__':
     from project.solvers.q_learning_policy import q_policies
