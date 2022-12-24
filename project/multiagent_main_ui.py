@@ -38,9 +38,11 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             """
             import multi_agent_environment as rendering
             self.renderer = rendering.MultiAgentRendering([configs.AGENT1_ID, configs.AGENT2_ID])
-            craters, zones = configs.read_scenarios(configs.SCENARIO_ID)
-            self.renderer.change_event(new_craters=craters, new_zones=zones)
+            #craters, zones = configs.read_scenarios(configs.SCENARIO_ID)
+            #self.renderer.change_event(new_craters=craters, new_zones=zones)
             self.render_map(self.renderer.render(mode="rgb_array"))
+            self.current_event_id = 0
+            self.sendEventButton.clicked.connect(self.send_event_button_click)
 
             """
             Setup the control buttons
@@ -401,6 +403,19 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.report_button.setStyleSheet("background-color: {}".format('none'))
             QtCore.QTimer.singleShot(5000, self.alert_report)
             self.report_slider_counter.setText('-')
+
+    def send_event_button_click(self):
+        try:
+            print('Sending event: ', self.current_event_id)
+            craters, zones = configs.read_scenarios(self.current_event_id)
+            self.renderer.change_event(new_craters=craters, new_zones=zones)
+            self.render_map(self.renderer.render(mode="rgb_array"))
+            event_msg = configs.MessageHelpers.pack_event(self.current_event_id)
+            self.current_event_id = (self.current_event_id + 1) % 8
+            self.controlpub.publish(event_msg)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
 
 qdarktheme.enable_hi_dpi()

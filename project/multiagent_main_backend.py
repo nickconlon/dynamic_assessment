@@ -33,6 +33,11 @@ class ControlThread(threading.Thread):
                 if _topic == configs.MessageHelpers.TOPICS_END_SIM:
                     self.state.needs_end_sim = True
                     logging.info(_msg)
+                elif _topic == configs.MessageHelpers.TOPICS_EVENT_UPDATE:
+                    event_id = configs.MessageHelpers.unpack_event(_data)
+                    self.state.current_event_id = event_id
+                    print("EVENT ID ", event_id)
+                    pass
                 elif configs.MessageHelpers.for_me(_data, self.state.agent_id):
                     if _topic == configs.MessageHelpers.TOPICS_ASSESSMENT_REQUEST:
                         agent_id, delivery_thresh, time_thresh, collisions_thresh = configs.MessageHelpers.unpack_assessment_request(_data)
@@ -108,8 +113,6 @@ def run_main(_agent_id, _mission_id, _subject_id, _color, _transition_uncertaint
                       _obstacles=[], _zones=[], _craters=[],
                       _state_transition=_transition_uncertainty,
                       _zone_transition=_dust_uncertainty)
-    craters, zones = configs.read_scenarios(configs.SCENARIO_ID)
-    env.change_event(new_craters=craters, new_zones=zones)
 
     """
     Setup the control policies
@@ -142,131 +145,137 @@ def run_main(_agent_id, _mission_id, _subject_id, _color, _transition_uncertaint
     Live task execution
     """
     print('Ready to run')
-    for i in range(100000):
-        """
-        Make sure the env has the correct goal
-        """
-        env.change_event(new_goal_label=robot_state.goal)
-
-        """
-        Run an assessment if needed
-        """
-        if robot_state.needs_assessment:
-            print("Running the assessment!")
-            c_oa, c_m, c_std, z_oa, z_m, z_std, predicted_states = assessment.run_goa_assessment_new(
-                policy.policies[robot_state.goal],
-                copy.deepcopy(env),
-                env.xy_from_index(state),
-                configs.OA_ROLLOUTS,
-                [robot_state.reward_assessment_threshold,
-                 robot_state.collision_assessment_threshold,
-                 robot_state.zone_assessment_threshold],
-                [0, 0,0],
-                _transition_uncertainty)
-
-            robot_state.reward_assessment = 0
-            robot_state.zone_assessment = z_oa
-            robot_state.collision_assessment = c_oa
-
-            robot_state.predicted_collision_count = (np.ceil(c_m), np.ceil(c_std))
-            robot_state.predicted_zone_count = (np.ceil(z_m), np.ceil(z_std))
-
-            assessment_index = 1
-            robot_state.needs_assessment = False
-            robot_state.assessed_goal = robot_state.goal
-
-            if c_oa <= 0.4: # TODO from UI
-                robot_state.movement_state = configs.MultiAgentState.STOP
-
-        """
-        Navigation states - get the next action
-        """
-        if robot_state.movement_state == configs.MultiAgentState.START:
-            a = policy.policies[robot_state.goal].pi(state)
-            time.sleep(configs.SPEED_AUTONOMY)
-        else:
-            a = -1
-
-        """
-        Execute the next action
-        """
-        if a in env.action_space:
-            state, reward, done, info = env.step(a)
+    try:
+        for i in range(100000):
             """
-            Update the current state
+            Make sure the env has the correct goal
             """
-            robot_state.collision_count += info['collisions']
-            robot_state.zone_count += info['zones']
-            robot_state.reward_count += info['rewards']
+            if robot_state.current_event_id != -1:
+                craters, zones = configs.read_scenarios(robot_state.current_event_id)
+                env.change_event(new_goal_label=robot_state.goal, new_craters=craters,new_zones=zones)
+            env.change_event(new_goal_label=robot_state.goal)
+            """
+            Run an assessment if needed
+            """
+            if robot_state.needs_assessment:
+                print("Running the assessment!")
+                c_oa, c_m, c_std, z_oa, z_m, z_std, predicted_states = assessment.run_goa_assessment_new(
+                    policy.policies[robot_state.goal],
+                    copy.deepcopy(env),
+                    env.xy_from_index(state),
+                    configs.OA_ROLLOUTS,
+                    [robot_state.reward_assessment_threshold,
+                     robot_state.collision_assessment_threshold,
+                     robot_state.zone_assessment_threshold],
+                    [0, 0,0],
+                    _transition_uncertainty)
 
-            robot_state.location = tuple(env.xy_from_index(state))
+                robot_state.reward_assessment = 0
+                robot_state.zone_assessment = z_oa
+                robot_state.collision_assessment = c_oa
 
-            if done:
-                robot_state.movement_state = configs.MultiAgentState.STOP
-                robot_state.at_goal = True
-                if info['location'] != configs.HOME:
-                    if robot_state.cargo_count >= 1:
-                        robot_state.delivery_count += 1
-                        robot_state.cargo_count -= 1
-                elif info['location'] == configs.HOME:
-                    robot_state.cargo_count = min(3, robot_state.cargo_count+3)
+                robot_state.predicted_collision_count = (np.ceil(c_m), np.ceil(c_std))
+                robot_state.predicted_zone_count = (np.ceil(z_m), np.ceil(z_std))
 
-            if configs.ENABLE_ET_GOA:
-                needs_assessment = False
-                if assessment_index >= predicted_states.shape[1] or np.count_nonzero(np.isnan(predicted_states[:, assessment_index])):
-                    print('assessing due to lack of data')
-                    needs_assessment = True
-                else:
-                    try:
-                        predicted_state_t = copy.deepcopy(predicted_states[:, assessment_index])
-                        predicted_state_t = predicted_state_t[~np.isnan(predicted_state_t).any(axis=1), :]
-                        p_expected = dynamics.tail(predicted_state_t, env.xy_from_index(state))
-                        print("tail: {:.2f}".format(p_expected))
-                    except Exception as e:
-                        p_expected = 0.0
-                        print(e)
-                        traceback.print_exc()
-                    try:
-                        # TODO map changes SI
-                        pass
-                    except Exception as e:
-                        p_expected = 0.0
-                        print(e)
-                        traceback.print_exc()
+                assessment_index = 1
+                robot_state.needs_assessment = False
+                robot_state.assessed_goal = robot_state.goal
 
-                    if p_expected <= _et_threshold:
+                if c_oa <= 0.4: # TODO from UI
+                    robot_state.movement_state = configs.MultiAgentState.STOP
+
+            """
+            Navigation states - get the next action
+            """
+            if robot_state.movement_state == configs.MultiAgentState.START:
+                a = policy.policies[robot_state.goal].pi(state)
+                time.sleep(configs.SPEED_AUTONOMY)
+            else:
+                a = -1
+
+            """
+            Execute the next action
+            """
+            if a in env.action_space:
+                state, reward, done, info = env.step(a)
+                """
+                Update the current state
+                """
+                robot_state.collision_count += info['collisions']
+                robot_state.zone_count += info['zones']
+                robot_state.reward_count += info['rewards']
+
+                robot_state.location = tuple(env.xy_from_index(state))
+
+                if done:
+                    robot_state.movement_state = configs.MultiAgentState.STOP
+                    robot_state.at_goal = True
+                    if info['location'] != configs.HOME:
+                        if robot_state.cargo_count >= 1:
+                            robot_state.delivery_count += 1
+                            robot_state.cargo_count -= 1
+                    elif info['location'] == configs.HOME:
+                        robot_state.cargo_count = min(3, robot_state.cargo_count+3)
+
+                if configs.ENABLE_ET_GOA:
+                    needs_assessment = False
+                    if assessment_index >= predicted_states.shape[1] or np.count_nonzero(np.isnan(predicted_states[:, assessment_index])):
+                        print('assessing due to lack of data')
                         needs_assessment = True
-                        print('assessing due to surprising data')
-                assessment_index += 1
-                robot_state.needs_assessment = needs_assessment
+                    else:
+                        try:
+                            predicted_state_t = copy.deepcopy(predicted_states[:, assessment_index])
+                            predicted_state_t = predicted_state_t[~np.isnan(predicted_state_t).any(axis=1), :]
+                            p_expected = dynamics.tail(predicted_state_t, env.xy_from_index(state))
+                            print("tail: {:.2f}".format(p_expected))
+                        except Exception as e:
+                            p_expected = 0.0
+                            print(e)
+                            traceback.print_exc()
+                        try:
+                            # TODO map changes SI
+                            pass
+                        except Exception as e:
+                            p_expected = 0.0
+                            print(e)
+                            traceback.print_exc()
+
+                        if p_expected <= _et_threshold:
+                            needs_assessment = True
+                            print('assessing due to surprising data')
+                    assessment_index += 1
+                    robot_state.needs_assessment = needs_assessment
+
+            """
+            Hold on a sec
+            """
+            time.sleep(0.01)
+
+            """
+            Should we end the simulation?
+            """
+            if robot_state.needs_end_sim:
+                break
 
         """
-        Hold on a sec
+        Saving off state
         """
-        time.sleep(0.01)
-
-        """
-        Should we end the simulation?
-        """
-        if robot_state.needs_end_sim:
-            break
-
-    """
-    Saving off state
-    """
-    print(time.time())
-    print('location: ', robot_state.location)
-    print('state: ', robot_state.movement_state)
-    print('goal: ', robot_state.goal)
-    print('craters: ', robot_state.collision_count)
-    print('zones: ', robot_state.zone_count)
-    print('reward: ', robot_state.reward_count)
-    print('deliveries: ', robot_state.delivery_count)
-
-    print("Ending loop and shutting down")
-    thread.close()
-    control_sub.close()
-    state_thread.close()
+        print(time.time())
+        print('location: ', robot_state.location)
+        print('state: ', robot_state.movement_state)
+        print('goal: ', robot_state.goal)
+        print('craters: ', robot_state.collision_count)
+        print('zones: ', robot_state.zone_count)
+        print('reward: ', robot_state.reward_count)
+        print('deliveries: ', robot_state.delivery_count)
+    except Exception as e:
+        print(e)
+        traceback.print_exc()
+    finally:
+        print("Ending loop and shutting down")
+        thread.close()
+        control_sub.close()
+        state_thread.close()
 
 
 if __name__ == '__main__':

@@ -152,6 +152,8 @@ class MultiAgentState:
         self.delivery_count = 0
         self.cargo_count = CARGO_RESUPPLY
 
+        self.current_event_id = 0
+
         self.assessed_goal = HOME
 
         self.reward_assessment_threshold = 0
@@ -196,6 +198,7 @@ class MessageHelpers:
     TOPICS_MOVE_REQUEST = 'MOVE_REQUEST'
     TOPICS_GOAL_REQUEST = 'GOAL_REQUEST'
     TOPICS_STATE_UPDATE = 'STATE_UPDATE'
+    TOPICS_EVENT_UPDATE = 'EVENT_UPDATE'
 
     @staticmethod
     def unpack(msg):
@@ -269,6 +272,16 @@ class MessageHelpers:
     @staticmethod
     def for_me(msg, agent_id):
         return msg['AGENTID'] == agent_id
+
+    @staticmethod
+    def pack_event(event_id):
+        msg = {'EVENT_ID': event_id}
+        return MessageHelpers.pack_message(MessageHelpers.TOPICS_EVENT_UPDATE, msg)
+
+    @staticmethod
+    def unpack_event(msg):
+        """ at all nodes"""
+        return msg['EVENT_ID']
 
 
 class Obstacle:

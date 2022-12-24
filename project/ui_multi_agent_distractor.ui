@@ -1029,9 +1029,9 @@
     <widget class="QPushButton" name="stopSimButton">
      <property name="geometry">
       <rect>
-       <x>90</x>
+       <x>10</x>
        <y>10</y>
-       <width>351</width>
+       <width>261</width>
        <height>41</height>
       </rect>
      </property>
@@ -1042,6 +1042,24 @@
      </property>
      <property name="text">
       <string>Stop Simulation</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="sendEventButton">
+     <property name="geometry">
+      <rect>
+       <x>280</x>
+       <y>10</y>
+       <width>261</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>18</pointsize>
+      </font>
+     </property>
+     <property name="text">
+      <string>Next Event</string>
      </property>
     </widget>
    </widget>
