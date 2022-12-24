@@ -74,8 +74,8 @@ class StateThread(threading.Thread):
         self.running = False
 
 
-def run_main(agent_id, mission_id, subject_id):
-    logging.basicConfig(filename='{}/{}_{}_{}_{}.log'.format(configs.LOGGING_PATH, agent_id, mission_id, subject_id, time.time()),
+def run_main(_agent_id, _mission_id, _subject_id, _color, _transition_uncertainty, _dust_uncertainty, _et_threshold):
+    logging.basicConfig(filename='{}/{}_{}_{}_{}.log'.format(configs.LOGGING_PATH, _agent_id, _mission_id, _subject_id, time.time()),
                         format='%(asctime)s %(message)s',
                         datefmt='%m/%d/%Y %I:%M:%S %p',
                         level=logging.INFO)
@@ -83,14 +83,13 @@ def run_main(agent_id, mission_id, subject_id):
     """
     Initialize zmq stuff
     """
-    map_pub = ZmqPublisher(configs.HOST, configs.MAP_PORT, bind=False)
     control_sub = ZmqSubscriber(configs.HOST, configs.CONTROL_PORT, timeout=2500, last_only=False)
     state_pub = ZmqPublisher(configs.HOST, configs.STATE_PORT, bind=False)
 
     """
     Initialize the application state machine
     """
-    robot_state = configs.MultiAgentState(agent_id, time.time(), configs.AGENT_COLOR[agent_id])
+    robot_state = configs.MultiAgentState(_agent_id, time.time(), configs.AGENT_COLOR[_agent_id])
     robot_state.location = configs.LOCATIONS[configs.HOME].position
     robot_state.goal = configs.LOCATIONS[configs.HOME].name
     """
@@ -105,7 +104,10 @@ def run_main(agent_id, mission_id, subject_id):
     """
     Setup the environment
     """
-    env = Environment(robot_state.location, configs.HOME, _obstacles=[], _zones=[], _craters=[])
+    env = Environment(robot_state.location, configs.HOME,
+                      _obstacles=[], _zones=[], _craters=[],
+                      _state_transition=_transition_uncertainty,
+                      _zone_transition=_dust_uncertainty)
     craters, zones = configs.read_scenarios(configs.SCENARIO_ID)
     env.change_event(new_craters=craters, new_zones=zones)
 
@@ -140,7 +142,7 @@ def run_main(agent_id, mission_id, subject_id):
     Live task execution
     """
     print('Ready to run')
-    for i in range(10000):
+    for i in range(100000):
         """
         Make sure the env has the correct goal
         """
@@ -160,7 +162,7 @@ def run_main(agent_id, mission_id, subject_id):
                  robot_state.collision_assessment_threshold,
                  robot_state.zone_assessment_threshold],
                 [0, 0,0],
-                configs.STATE_UNCERTAINTY)
+                _transition_uncertainty)
 
             robot_state.reward_assessment = 0
             robot_state.zone_assessment = z_oa
@@ -173,7 +175,7 @@ def run_main(agent_id, mission_id, subject_id):
             robot_state.needs_assessment = False
             robot_state.assessed_goal = robot_state.goal
 
-            if c_oa <= 0.4:
+            if c_oa <= 0.4: # TODO from UI
                 robot_state.movement_state = configs.MultiAgentState.STOP
 
         """
@@ -232,7 +234,7 @@ def run_main(agent_id, mission_id, subject_id):
                         print(e)
                         traceback.print_exc()
 
-                    if p_expected <= 0.01:
+                    if p_expected <= _et_threshold:
                         needs_assessment = True
                         print('assessing due to surprising data')
                 assessment_index += 1
@@ -263,20 +265,29 @@ def run_main(agent_id, mission_id, subject_id):
 
     print("Ending loop and shutting down")
     thread.close()
-    map_pub.close()
     control_sub.close()
     state_thread.close()
 
 
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser(prog='test', description='')
     parser.add_argument('-a', '--agentid', required=True, type=int)
-    #parser.add_argument('-m', '--missionid', required=True, type=int)
-    #parser.add_argument('-s', '--subjectid', required=True, type=int)
+    parser.add_argument('-m', '--missionid', type=int, default=1)
+    parser.add_argument('-s', '--subjectid', type=int, default=1)
+    parser.add_argument('-e', '--et_thresh',  type=float, default=configs.ET_THRESHOLD)
+    parser.add_argument('-t', '--p_transition', type=float, default=configs.STATE_UNCERTAINTY)
+    parser.add_argument('-d', '--p_dust', type=float, default=configs.ZONE_UNCERTAINTY)
     args = parser.parse_args()
 
     agent_id = args.agentid
-    mission_id = 1#args.missionid
-    subject_id = 1#args.subjectid
-    run_main(agent_id, mission_id, subject_id)
+    mission_id = args.missionid
+    subject_id = args.subjectid
+    agent_et_threshold = args.et_thresh
+    agent_color = configs.AGENT_COLOR[agent_id]
+    agent_transition_uncertainty = args.p_transition
+    agent_dust_uncertainty = args.p_dust
+    run_main(agent_id, mission_id, subject_id,
+             agent_color,
+             agent_transition_uncertainty,
+             agent_dust_uncertainty,
+             agent_et_threshold)

@@ -28,7 +28,7 @@ SCENARIO_PATH = './data/scenarios'
 
 CARGO_RESUPPLY = 3
 
-SCENARIO_ID = 2
+SCENARIO_ID = 7
 
 #
 # Agent IDs and colors
@@ -57,6 +57,8 @@ CRATER_COLOR = (255, 255, 255)
 #
 OA_ROLLOUTS = 25
 STATE_UNCERTAINTY = 0.9
+ZONE_UNCERTAINTY = 0.5
+ET_THRESHOLD = 0.05
 
 #
 # Control delays

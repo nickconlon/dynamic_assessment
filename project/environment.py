@@ -6,8 +6,11 @@ import project.multiagent_configs as configs
 from project.multiagent_configs import Obstacle
 import logging
 
+
 class Environment(Env):
-    def __init__(self, _pos_start, _goal_label, _obstacles=None, _zones=None, _craters=None):
+    def __init__(self, _pos_start, _goal_label,
+                 _obstacles=None, _zones=None,  _craters=None,
+                 _state_transition=0.9, _zone_transition=0.5):
         super(Environment, self).__init__()
         self.minX = 0
         self.maxX = 50
@@ -45,11 +48,11 @@ class Environment(Env):
         self.base_image = cv2.imread("./imgs/mars.jpg")
         self.path_color = (107, 183, 189)
         self.goal_color = (0, 255, 0)
-        self.agent_color = (255, 255, 255)
         self.home_color = (0, 255, 0)
 
         self.stochastic_transitions = False
-        self.transition_probability = 0.9
+        self.state_transition_probability = _state_transition
+        self.zone_transition_probability = _zone_transition
 
         self.num_steps = 0
 
@@ -76,7 +79,7 @@ class Environment(Env):
         zone_hits = 0
         # Base transition
         if self.stochastic_transitions:
-            if np.random.rand() > self.transition_probability:
+            if np.random.rand() > self.state_transition_probability:
                 possible_actions = list(self.actions.keys())
                 possible_actions.remove(action)
                 action = np.random.choice(a=possible_actions, p=np.ones_like(possible_actions) / len(possible_actions))
@@ -85,7 +88,7 @@ class Environment(Env):
         for zone in self.zones:
             if zone.collision(*self.pos):
                 zone_hits = 1
-                if np.random.rand() > 0.5:
+                if np.random.rand() > self.zone_transition_probability:
                     possible_actions = list(self.actions.keys())
                     possible_actions.remove(action)
                     action = np.random.choice(a=possible_actions,
