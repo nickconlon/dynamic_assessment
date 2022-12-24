@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.stats as stats
-
+import scipy.special as spacial
 
 class Metrics:
     def __init__(self):
@@ -77,13 +77,9 @@ class FaMSeC:
         if d_lpm == 0:
             outcome_assessment = 1
         elif d_upm == 0:
-            outcome_assessment = -1
+            outcome_assessment = 0
         else:
-            print(d_upm)
-            print(d_lpm)
-            print(d_upm / d_lpm)
-            outcome_assessment = Metrics.tanh(d_upm / d_lpm)  # 2 / (1 + np.exp(-np.log(d_upm / d_lpm))) - 1
-
+            outcome_assessment = spacial.expit(d_upm/d_lpm-1)
         return outcome_assessment
 
     @staticmethod

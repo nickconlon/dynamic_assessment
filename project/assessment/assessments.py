@@ -3,7 +3,7 @@ import sys
 import numpy as np
 from scipy import stats
 from project.assessment.famsec import FaMSeC
-
+import project.multiagent_configs as configs
 
 class CompetencyAssessmentBase:
     def __init__(self):
@@ -47,19 +47,19 @@ class StaticAssessment(CompetencyAssessmentBase):
                 rewards[i] += info['rewards']
                 if done:
                     if collisions[i] < 5:
-                        deliveries += 1
+                        deliveries[i] += 1
                     break
 
         # np.save('./data/noise_discrete.npy', predictions)
-        return rewards, collisions, zones, predictions, times
+        return rewards, collisions, zones, predictions, times, deliveries
 
     def run_assessment(self, policy, env, state, num_rollouts, z_star, transition_uncertainty):
-        rewards, collisions, zones, states, times = self.rollout(policy, env, state, num_rollouts, transition_uncertainty)
+        rewards, collisions, zones, states, times, deliveries = self.rollout(policy, env, state, num_rollouts, transition_uncertainty)
         oa = self.famsec.outcome_assessment(reward_dist=rewards, r_star=z_star)
         return oa, rewards, collisions, times, states
 
     def run_goa_assessment_new(self, policy, env, state, num_rollouts, z_stars, current_counts, transition_uncertainty):
-        rewards, collisions, zones, states, times = self.rollout(policy, env, state, num_rollouts, transition_uncertainty)
+        rewards, collisions, zones, states, times, deliveries = self.rollout(policy, env, state, num_rollouts, transition_uncertainty)
 
         collisions_oa = self.famsec.outcome_assessment(reward_dist=current_counts[1]+collisions, r_star=z_stars[1], swap=True)
         collisions_oa = np.around(collisions_oa, decimals=2)
@@ -68,8 +68,24 @@ class StaticAssessment(CompetencyAssessmentBase):
         zones_oa = np.around(zones_oa, decimals=2)
         return collisions_oa, np.mean(collisions), np.std(collisions), zones_oa, np.mean(zones), np.std(zones), states
 
+    def run_another_assessment(self, policy, env, state, num_rollouts, transition_uncertainty):
+        rewards, collisions, zones, states, times, deliveries = self.rollout(policy, env, state, num_rollouts,
+                                                                             transition_uncertainty)
+        partition = np.array([-2, 0, 2])
+        z_star = 2
+        deliveries_oa = self.famsec.generalized_outcome_assessment(deliveries, partition, z_star)
+
+        report = configs.AssessmentReport()
+        report.delivery_goa = deliveries_oa
+        report.mu_craters = int(np.around(np.mean(collisions)))
+        report.std_craters = int(np.around(np.std(collisions)))
+        report.mu_zones = int(np.around(np.mean(zones)))
+        report.std_zones = int(np.around(np.std(zones)))
+        report.predicted_states = states
+        return report
+
     def run_goa_assessment(self, policy, env, state, num_rollouts, z_stars, current_counts, transition_uncertainty) -> object:
-        rewards, collisions, zones, states, times = self.rollout(policy, env, state, num_rollouts, transition_uncertainty)
+        rewards, collisions, zones, states, times, deliveries = self.rollout(policy, env, state, num_rollouts, transition_uncertainty)
 
         rewards_oa = self.famsec.outcome_assessment(reward_dist=current_counts[0]+rewards, r_star=z_stars[0])
         rewards_oa = np.around(rewards_oa, decimals=2)

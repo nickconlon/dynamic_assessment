@@ -36,8 +36,9 @@ class ControlThread(threading.Thread):
                 elif _topic == configs.MessageHelpers.TOPICS_EVENT_UPDATE:
                     event_id = configs.MessageHelpers.unpack_event(_data)
                     self.state.current_event_id = event_id
-                    print("EVENT ID ", event_id)
-                    pass
+                elif _topic == configs.MessageHelpers.TOPICS_SET_ALERT:
+                    new_alert_level = configs.MessageHelpers.unpack_alert_update(_data)
+                    self.state.goa_alert_level = new_alert_level
                 elif configs.MessageHelpers.for_me(_data, self.state.agent_id):
                     if _topic == configs.MessageHelpers.TOPICS_ASSESSMENT_REQUEST:
                         agent_id, delivery_thresh, time_thresh, collisions_thresh = configs.MessageHelpers.unpack_assessment_request(_data)
@@ -72,6 +73,7 @@ class StateThread(threading.Thread):
             self.state.sim_current_time = int(time.time() - self.state.sim_start_time)
             _msg = configs.MessageHelpers.state_update(self.state.state_update_message())
             self.publisher.publish(_msg)
+            self.state.new_assessment = False
             logging.info(_msg)
             time.sleep(0.5)
 
@@ -154,34 +156,33 @@ def run_main(_agent_id, _mission_id, _subject_id, _color, _transition_uncertaint
                 craters, zones = configs.read_scenarios(robot_state.current_event_id)
                 env.change_event(new_goal_label=robot_state.goal, new_craters=craters,new_zones=zones)
             env.change_event(new_goal_label=robot_state.goal)
+
             """
             Run an assessment if needed
             """
             if robot_state.needs_assessment:
                 print("Running the assessment!")
-                c_oa, c_m, c_std, z_oa, z_m, z_std, predicted_states = assessment.run_goa_assessment_new(
-                    policy.policies[robot_state.goal],
-                    copy.deepcopy(env),
-                    env.xy_from_index(state),
-                    configs.OA_ROLLOUTS,
-                    [robot_state.reward_assessment_threshold,
-                     robot_state.collision_assessment_threshold,
-                     robot_state.zone_assessment_threshold],
-                    [0, 0,0],
-                    _transition_uncertainty)
+                assessment_report = assessment.run_another_assessment(policy.policies[robot_state.goal],
+                                                                      copy.deepcopy(env),
+                                                                      env.xy_from_index(state),
+                                                                      configs.OA_ROLLOUTS,
+                                                                      _transition_uncertainty)
 
+                robot_state.delivery_assessment = assessment_report.delivery_goa
                 robot_state.reward_assessment = 0
-                robot_state.zone_assessment = z_oa
-                robot_state.collision_assessment = c_oa
-
-                robot_state.predicted_collision_count = (np.ceil(c_m), np.ceil(c_std))
-                robot_state.predicted_zone_count = (np.ceil(z_m), np.ceil(z_std))
-
-                assessment_index = 1
+                robot_state.zone_assessment = 0
+                robot_state.collision_assessment = 0
+                robot_state.predicted_collision_count = (assessment_report.mu_craters, assessment_report.std_craters)
+                robot_state.predicted_zone_count = (assessment_report.mu_zones, assessment_report.std_zones)
                 robot_state.needs_assessment = False
+                robot_state.new_assessment = True
                 robot_state.assessed_goal = robot_state.goal
 
-                if c_oa <= 0.4: # TODO from UI
+                predicted_states = assessment_report.predicted_states
+                assessment_index = 1
+
+                label = configs.AssessmentReport.convert_famsec(robot_state.delivery_assessment)
+                if configs.AssessmentReport.FAMSEC2INDEX[label] <= robot_state.goa_alert_level:
                     robot_state.movement_state = configs.MultiAgentState.STOP
 
             """
@@ -280,7 +281,7 @@ def run_main(_agent_id, _mission_id, _subject_id, _color, _transition_uncertaint
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='test', description='')
-    parser.add_argument('-a', '--agentid', required=True, type=int)
+    parser.add_argument('-a', '--agentid', type=int, default=1)
     parser.add_argument('-m', '--missionid', type=int, default=1)
     parser.add_argument('-s', '--subjectid', type=int, default=1)
     parser.add_argument('-e', '--et_thresh',  type=float, default=configs.ET_THRESHOLD)

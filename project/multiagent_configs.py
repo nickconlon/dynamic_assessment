@@ -82,32 +82,51 @@ LOCATIONS = {HOME: Location(HOME, np.asarray([10, 10]), './solvers/q_HOME.npy'),
              AREA_2: Location(AREA_2, np.asarray([14, 40]), './solvers/q_AREA_2.npy'),
              AREA_3: Location(AREA_3, np.asarray([38, 47]), './solvers/q_AREA_3.npy')}
 
+
 #
 # FaMSeC
 #
-FAMSEC_COLORS = {'Highly Unlikely': 'darkRed',
-                 'Unlikely': 'darksalmon',
-                 'About Even': 'yellow',
-                 'Likely': 'greenyellow',
-                 'Highly Likely': 'darkGreen'}
-FAMSEC_LABELS = {'Highly Unlikely': [0.0, 0.1],
-                 'Unlikely': [0.1, 0.4],
-                 'About Even': [0.4, 0.6],
-                 'Likely': [0.6, 0.9],
-                 'Highly Likely': [0.90, 1.1]}
+class AssessmentReport:
+    FAMSEC2INDEX = {'Highly Unlikely': 1,
+                    'Unlikely': 2,
+                    'About Even': 3,
+                    'Likely': 4,
+                    'Highly Likely': 5}
+    INDEX2FAMSEC = {1: 'Highly Unlikely',
+                    2: 'Unlikely',
+                    3: 'About Even',
+                    4: 'Likely',
+                    5: 'Highly Likely'}
+    FAMSEC_COLORS = {'Highly Unlikely': 'darkRed',
+                     'Unlikely': 'darksalmon',
+                     'About Even': 'yellow',
+                     'Likely': 'greenyellow',
+                     'Highly Likely': 'darkGreen'}
+    FAMSEC_LABELS = {'Highly Unlikely': [0.0, 0.1],
+                     'Unlikely': [0.1, 0.4],
+                     'About Even': [0.4, 0.6],
+                     'Likely': [0.6, 0.9],
+                     'Highly Likely': [0.90, 1.1]}
 
+    def __init__(self):
+        self.delivery_goa = 0
+        self.mu_craters = 0
+        self.std_craters = 0
+        self.mu_zones = 0
+        self.std_zones = 0
+        self.predicted_states = []
 
-def convert_famsec(prob):
-    """
-    https://waf.cs.illinois.edu/visualizations/Perception-of-Probability-Words/
+    @staticmethod
+    def convert_famsec(prob):
+        """
+        https://waf.cs.illinois.edu/visualizations/Perception-of-Probability-Words/
 
-    :param prob:
-    :return:
-    """
-
-    for (k, v) in FAMSEC_LABELS.items():
-        if v[0] <= prob < v[1]:
-            return k
+        :param prob:
+        :return:
+        """
+        for (k, v) in AssessmentReport.FAMSEC_LABELS.items():
+            if v[0] <= prob < v[1]:
+                return k
 
 
 class MultiAgentState:
@@ -130,6 +149,8 @@ class MultiAgentState:
     STATUS_REWARD_GOA = 'STATUS_REWARD_GOA'
     STATUS_COLLISIONS_GOA = 'STATUS_COLLISIONS_GOA'
     STATUS_ZONES_GOA = 'STATUS_TIME_GOA'
+    STATUS_DELIVERIES_GOA = 'STATUS_DELIVERIES_GOA'
+    STATUS_NEW_ASSESSMENT = 'STATUS_NEW_ASSESSMENT'
 
     # constant state enums
     STOP = 'STOP'
@@ -152,9 +173,13 @@ class MultiAgentState:
         self.delivery_count = 0
         self.cargo_count = CARGO_RESUPPLY
 
-        self.current_event_id = 0
+        self.goa_alert_level = 0.5
+        self.current_event_id = -1
 
         self.assessed_goal = HOME
+
+        self.new_assessment = False
+        self.delivery_assessment = 1
 
         self.reward_assessment_threshold = 0
         self.reward_assessment = 1  # String
@@ -184,11 +209,13 @@ class MultiAgentState:
                             self.STATUS_CRATERS: self.collision_count,
                             self.STATUS_PREDICTED_CRATERS: self.predicted_collision_count,
                             self.STATUS_COLOR: self.color,
-                            self.STATUS_REWARD_GOA: convert_famsec(self.reward_assessment),
-                            self.STATUS_COLLISIONS_GOA: convert_famsec(self.collision_assessment),
-                            self.STATUS_ZONES_GOA: convert_famsec(self.zone_assessment),
+                            self.STATUS_REWARD_GOA: AssessmentReport.convert_famsec(self.reward_assessment),
+                            self.STATUS_COLLISIONS_GOA: AssessmentReport.convert_famsec(self.collision_assessment),
+                            self.STATUS_ZONES_GOA: AssessmentReport.convert_famsec(self.zone_assessment),
                             self.STATUS_DELIVERIES: self.delivery_count,
-                            self.STATUS_CARGO_COUNT: self.cargo_count}
+                            self.STATUS_CARGO_COUNT: self.cargo_count,
+                            self.STATUS_NEW_ASSESSMENT: self.new_assessment,
+                            self.STATUS_DELIVERIES_GOA: AssessmentReport.convert_famsec(self.delivery_assessment)}
         return single_agent_msg
 
 
@@ -199,6 +226,7 @@ class MessageHelpers:
     TOPICS_GOAL_REQUEST = 'GOAL_REQUEST'
     TOPICS_STATE_UPDATE = 'STATE_UPDATE'
     TOPICS_EVENT_UPDATE = 'EVENT_UPDATE'
+    TOPICS_SET_ALERT = 'TOPICS_SET_ALERT'
 
     @staticmethod
     def unpack(msg):
@@ -225,14 +253,14 @@ class MessageHelpers:
         """ to backend from UI """
         msg = {'AGENTID': agent_id,
                'REWARD': reward_threshold,
-               'ZONE': zone_threshold,
-               'COLLISIONS': collision_threshold}
+               'ZONE_THRESHOLD': zone_threshold,
+               'COLLISION_THRESHOLD': collision_threshold}
         return MessageHelpers.pack_message(MessageHelpers.TOPICS_ASSESSMENT_REQUEST, msg)
 
     @staticmethod
     def unpack_assessment_request(msg):
         """ at backend """
-        return msg['AGENTID'], msg['REWARD'], msg['ZONE'], msg['COLLISIONS']
+        return msg['AGENTID'], msg['REWARD'], msg['ZONE_THRESHOLD'], msg['COLLISION_THRESHOLD']
 
     @staticmethod
     def move_request(agent_id, state):
@@ -275,6 +303,7 @@ class MessageHelpers:
 
     @staticmethod
     def pack_event(event_id):
+        """ to backend from UI """
         msg = {'EVENT_ID': event_id}
         return MessageHelpers.pack_message(MessageHelpers.TOPICS_EVENT_UPDATE, msg)
 
@@ -282,6 +311,17 @@ class MessageHelpers:
     def unpack_event(msg):
         """ at all nodes"""
         return msg['EVENT_ID']
+
+    @staticmethod
+    def pack_alert_update(alert_level):
+        """ to backend from UI """
+        msg = {'ALERT_LEVEL': alert_level}
+        return MessageHelpers.pack_message(MessageHelpers.TOPICS_SET_ALERT, msg)
+
+    @staticmethod
+    def unpack_alert_update(msg):
+        """ at all nodes """
+        return msg['ALERT_LEVEL']
 
 
 class Obstacle:
@@ -298,13 +338,6 @@ class Obstacle:
             return False
 
 
-class Event:
-    def __init__(self, event_time, changed_zones=None, changed_craters=None):
-        self.time = event_time
-        self.changed_zones = [] if changed_zones is None else changed_zones
-        self.changed_craters = [] if changed_craters is None else changed_craters
-
-
 def create_new_craters():
     lx = np.random.randint(10, 50)
     ly = np.random.randint(10, 50)
@@ -313,10 +346,10 @@ def create_new_craters():
     craters = [Obstacle(int(x), int(y), 1, CRATER_COLOR) for (x, y) in
                zip(np.random.normal(loc=lx, scale=sx, size=25), np.random.normal(loc=ly, scale=sy, size=25))]
 
-    sx = sx+3
-    sy = sx+3
+    sx = sx + 3
+    sy = sx + 3
     zones = [Obstacle(int(x), int(y), 2, ZONE_COLOR) for (x, y) in
-               zip(np.random.normal(loc=lx, scale=sx, size=25), np.random.normal(loc=ly, scale=sy, size=25))]
+             zip(np.random.normal(loc=lx, scale=sx, size=25), np.random.normal(loc=ly, scale=sy, size=25))]
     return craters, zones
 
 
@@ -335,8 +368,8 @@ def save_scenarios(num_runs):
 
 def read_scenarios(scenario_id):
     c1, z1 = read_scenario(scenario_id)
-    c2, z2 = read_scenario(scenario_id+1)
-    return c1+c2, z1+z2
+    c2, z2 = read_scenario(scenario_id + 1)
+    return c1 + c2, z1 + z2
 
 
 def read_scenario(scenario_id):

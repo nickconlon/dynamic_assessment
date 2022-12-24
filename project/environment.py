@@ -297,12 +297,9 @@ if __name__ == '__main__':
               zip(np.random.normal(loc=40, scale=5, size=25), np.random.normal(loc=20, scale=5, size=25))]
     zones2 = [Obstacle(int(x), int(y), 2, configs.ZONE_COLOR) for (x, y) in
               zip(np.random.normal(loc=40, scale=5, size=25), np.random.normal(loc=20, scale=5, size=25))]
-    events = [configs.Event(event_time=1, changed_zones=zones1),
-              configs.Event(event_time=15, changed_zones=zones2)]
     s = env.reset()
     logging.basicConfig(filename='test.log',format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p' )
     for i in range(100):
-        [events.remove(e) if env.apply_event(e, i) is 1 else 0 for e in events]
         logging.warning("test")
         env.render()
         a = policy_container.get_policy(s, configs.AREA_1)

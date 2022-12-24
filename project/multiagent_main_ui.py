@@ -12,6 +12,7 @@ import project.ui_multi_agent_distractor as ui
 import project.communications.zmq_subscriber as subscriber
 from project.communications.zmq_publisher import ZmqPublisher
 import project.multiagent_configs as configs
+import multi_agent_environment as rendering
 
 
 class Generic_ZeroMQ_Listener(QtCore.QObject):
@@ -34,12 +35,9 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             QMainWindow.__init__(self)
             self.setupUi(self)
             """
-            TODO Testing
+            Setup rendering and events through the UI
             """
-            import multi_agent_environment as rendering
             self.renderer = rendering.MultiAgentRendering([configs.AGENT1_ID, configs.AGENT2_ID])
-            #craters, zones = configs.read_scenarios(configs.SCENARIO_ID)
-            #self.renderer.change_event(new_craters=craters, new_zones=zones)
             self.render_map(self.renderer.render(mode="rgb_array"))
             self.current_event_id = 0
             self.sendEventButton.clicked.connect(self.send_event_button_click)
@@ -104,6 +102,10 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             print(e)
             traceback.print_exc()
 
+    def temp_highlight(self, widget_func, timeout=1000, color="green"):
+        widget_func.setStyleSheet("background-color: {}".format(color))
+        QtCore.QTimer.singleShot(timeout, lambda: self.sendEventButton.setStyleSheet(""))
+
     def state_update_robot1(self, m):
         try:
             self.robot_location.setText(str(m[configs.MultiAgentState.STATUS_LOCATION]))
@@ -128,13 +130,15 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             elif m[configs.MultiAgentState.STATUS_STATE] == configs.MultiAgentState.START:
                 self.startControlButton.setStyleSheet("background-color: green")
 
-            assessment_msg = {'rewards': m[configs.MultiAgentState.STATUS_REWARD_GOA],
-                              'collisions': m[configs.MultiAgentState.STATUS_COLLISIONS_GOA],
-                              'zones': m[configs.MultiAgentState.STATUS_ZONES_GOA],
-                              'predicted_craters': m[configs.MultiAgentState.STATUS_PREDICTED_CRATERS],
-                              'predicted_zones': m[configs.MultiAgentState.STATUS_PREDICTED_ZONES],
-                              'target': m[configs.MultiAgentState.STATUS_ASSESSED_GOAL]}
-            self.agent1_assessment_update(assessment_msg)
+            if m[configs.MultiAgentState.STATUS_NEW_ASSESSMENT]:
+                assessment_msg = {'rewards': m[configs.MultiAgentState.STATUS_REWARD_GOA],
+                                  'collisions': m[configs.MultiAgentState.STATUS_COLLISIONS_GOA],
+                                  'zones': m[configs.MultiAgentState.STATUS_ZONES_GOA],
+                                  'predicted_craters': m[configs.MultiAgentState.STATUS_PREDICTED_CRATERS],
+                                  'predicted_zones': m[configs.MultiAgentState.STATUS_PREDICTED_ZONES],
+                                  'target': m[configs.MultiAgentState.STATUS_ASSESSED_GOAL],
+                                  'deliveries': m[configs.MultiAgentState.STATUS_DELIVERIES_GOA]}
+                self.agent1_assessment_update(assessment_msg)
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -163,13 +167,15 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             elif m[configs.MultiAgentState.STATUS_STATE] == configs.MultiAgentState.START:
                 self.robot2_startControlButton.setStyleSheet("background-color: green")
 
-            assessment_msg = {'rewards': m[configs.MultiAgentState.STATUS_REWARD_GOA],
-                              'collisions': m[configs.MultiAgentState.STATUS_COLLISIONS_GOA],
-                              'zones': m[configs.MultiAgentState.STATUS_ZONES_GOA],
-                              'predicted_craters': m[configs.MultiAgentState.STATUS_PREDICTED_CRATERS],
-                              'predicted_zones': m[configs.MultiAgentState.STATUS_PREDICTED_ZONES],
-                              'target': m[configs.MultiAgentState.STATUS_ASSESSED_GOAL]}
-            self.agent2_assessment_update(assessment_msg)
+            if m[configs.MultiAgentState.STATUS_NEW_ASSESSMENT]:
+                assessment_msg = {'rewards': m[configs.MultiAgentState.STATUS_REWARD_GOA],
+                                  'collisions': m[configs.MultiAgentState.STATUS_COLLISIONS_GOA],
+                                  'zones': m[configs.MultiAgentState.STATUS_ZONES_GOA],
+                                  'predicted_craters': m[configs.MultiAgentState.STATUS_PREDICTED_CRATERS],
+                                  'predicted_zones': m[configs.MultiAgentState.STATUS_PREDICTED_ZONES],
+                                  'target': m[configs.MultiAgentState.STATUS_ASSESSED_GOAL],
+                                  'deliveries': m[configs.MultiAgentState.STATUS_DELIVERIES_GOA]}
+                self.agent2_assessment_update(assessment_msg)
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -199,16 +205,20 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             traceback.print_exc()
 
     def clear_area_buttons(self, agent_id):
-        if agent_id == configs.AGENT1_ID:
-            self.goHomeButton.setStyleSheet("background-color: none")
-            self.goArea1Button.setStyleSheet("background-color: none")
-            self.goArea2Button.setStyleSheet("background-color: none")
-            self.goArea3Button.setStyleSheet("background-color: none")
-        elif agent_id == configs.AGENT2_ID:
-            self.robot2_goHomeButton.setStyleSheet("background-color: none")
-            self.robot2_goArea1Button.setStyleSheet("background-color: none")
-            self.robot2_goArea2Button.setStyleSheet("background-color: none")
-            self.robot2_goArea3Button.setStyleSheet("background-color: none")
+        try:
+            if agent_id == configs.AGENT1_ID:
+                self.goHomeButton.setStyleSheet("")
+                self.goArea1Button.setStyleSheet("")
+                self.goArea2Button.setStyleSheet("")
+                self.goArea3Button.setStyleSheet("")
+            elif agent_id == configs.AGENT2_ID:
+                self.robot2_goHomeButton.setStyleSheet("")
+                self.robot2_goArea1Button.setStyleSheet("")
+                self.robot2_goArea2Button.setStyleSheet("")
+                self.robot2_goArea3Button.setStyleSheet("")
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
     def agent1_go_home_button_click(self):
         try:
@@ -301,64 +311,92 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             traceback.print_exc()
 
     def clear_drive_mode_buttons(self, agent_id):
-        if agent_id == configs.AGENT1_ID:
-            self.startControlButton.setStyleSheet("background-color: none")
-            self.stopControlButton.setStyleSheet("background-color: none")
-        elif agent_id == configs.AGENT2_ID:
-            self.robot2_startControlButton.setStyleSheet("background-color: none")
-            self.robot2_stopControlButton.setStyleSheet("background-color: none")
+        try:
+            if agent_id == configs.AGENT1_ID:
+                self.startControlButton.setStyleSheet("")
+                self.stopControlButton.setStyleSheet("")
+            elif agent_id == configs.AGENT2_ID:
+                self.robot2_startControlButton.setStyleSheet("")
+                self.robot2_stopControlButton.setStyleSheet("")
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
     def agent1_start_control_button_click(self):
-        self.clear_drive_mode_buttons(configs.AGENT1_ID)
-        self.startControlButton.setStyleSheet("background-color: green")
-        _msg = configs.MessageHelpers.move_request(configs.AGENT1_ID, configs.MultiAgentState.START)
-        self.controlpub.publish(_msg)
+        try:
+            self.clear_drive_mode_buttons(configs.AGENT1_ID)
+            self.startControlButton.setStyleSheet("background-color: green")
+            _msg = configs.MessageHelpers.move_request(configs.AGENT1_ID, configs.MultiAgentState.START)
+            self.controlpub.publish(_msg)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
     def agent1_stop_control_button_click(self):
-        self.clear_drive_mode_buttons(configs.AGENT1_ID)
-        self.stopControlButton.setStyleSheet("background-color: green")
-        _msg = configs.MessageHelpers.move_request(configs.AGENT1_ID, configs.MultiAgentState.STOP)
-        self.controlpub.publish(_msg)
+        try:
+            self.clear_drive_mode_buttons(configs.AGENT1_ID)
+            self.stopControlButton.setStyleSheet("background-color: green")
+            _msg = configs.MessageHelpers.move_request(configs.AGENT1_ID, configs.MultiAgentState.STOP)
+            self.controlpub.publish(_msg)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
     def agent2_start_control_button_click(self):
-        self.clear_drive_mode_buttons(configs.AGENT2_ID)
-        self.robot2_startControlButton.setStyleSheet("background-color: green")
-        _msg = configs.MessageHelpers.move_request(configs.AGENT2_ID, configs.MultiAgentState.START)
-        self.controlpub.publish(_msg)
+        try:
+            self.clear_drive_mode_buttons(configs.AGENT2_ID)
+            self.robot2_startControlButton.setStyleSheet("background-color: green")
+            _msg = configs.MessageHelpers.move_request(configs.AGENT2_ID, configs.MultiAgentState.START)
+            self.controlpub.publish(_msg)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
     def agent2_stop_control_button_click(self):
-        self.clear_drive_mode_buttons(configs.AGENT2_ID)
-        self.robot2_stopControlButton.setStyleSheet("background-color: green")
-        _msg = configs.MessageHelpers.move_request(configs.AGENT2_ID, configs.MultiAgentState.STOP)
-        self.controlpub.publish(_msg)
+        try:
+            self.clear_drive_mode_buttons(configs.AGENT2_ID)
+            self.robot2_stopControlButton.setStyleSheet("background-color: green")
+            _msg = configs.MessageHelpers.move_request(configs.AGENT2_ID, configs.MultiAgentState.STOP)
+            self.controlpub.publish(_msg)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
     #
     # Self-assessment stuff
     #
     def self_assessment_button_click(self):
-        self.assessment_button.setStyleSheet("background-color: green")
-        oa_zones = 5#self.outcome_assessment_slider_zones.value()
-        oa_hits = 5#self.outcome_assessment_slider_craters.value()
-        for agent_id in [configs.AGENT1_ID, configs.AGENT2_ID]:
-            _msg = configs.MessageHelpers.assessment_request(agent_id, 0, oa_zones, oa_hits)
-            print(_msg)
-            self.controlpub.publish(_msg)
+        try:
+            self.assessment_button.setStyleSheet("background-color: green")
+            oa_zones = 5
+            oa_hits = 5
+            for agent_id in [configs.AGENT1_ID, configs.AGENT2_ID]:
+                _msg = configs.MessageHelpers.assessment_request(agent_id, 0, oa_zones, oa_hits)
+                print(_msg)
+                self.controlpub.publish(_msg)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+
+    def clear_assessment_button(self):
+        self.assessment_button.setStyleSheet("")
 
     def agent1_assessment_update(self, msg):
         """ Update the assessment display for agent 1 """
         try:
-            print(msg)
+            self.clear_assessment_button()
             target_goal = msg['target']
             collisions = msg['collisions']
             zones = msg['zones']
             predicted_craters = msg['predicted_craters']
             predicted_zones = msg['predicted_zones']
+            deliveries_goa = msg['deliveries']
 
-            likelihood_string = 'Likelihood of successful navigation to {}: {}'.format(target_goal, str(collisions))
+            likelihood_string = 'Likelihood of successful navigation to {}: {}'.format(target_goal, str(deliveries_goa))
             self.robot1_likelihood_label.setText(likelihood_string)
             self.robot1_crater_assessment_value.setText(str(predicted_craters[0]) + u' \u00B1 '+str(predicted_craters[1]))
             self.robot1_zone_assessment_value.setText(str(predicted_zones[0]) + u' \u00B1 '+str(predicted_zones[1]))
-
+            self.temp_highlight(self.frame_10)
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -366,43 +404,67 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
     def agent2_assessment_update(self, msg):
         """ Update the assessment display for agent 2 """
         try:
-            print(msg)
+            self.clear_assessment_button()
             target_goal = msg['target']
             collisions = msg['collisions']
             zones = msg['zones']
             predicted_craters = msg['predicted_craters']
             predicted_zones = msg['predicted_zones']
+            deliveries_goa = msg['deliveries']
 
-            likelihood_string = 'Likelihood of successful navigation to {}: {}'.format(target_goal, str(collisions))
+            likelihood_string = 'Likelihood of successful navigation to {}: {}'.format(target_goal, str(deliveries_goa))
             self.robot2_likelihood_label.setText(likelihood_string)
             self.robot2_crater_assessment_value.setText(str(predicted_craters[0]) + u' \u00B1 '+str(predicted_craters[1]))
             self.robot2_zone_assessment_value.setText(str(predicted_zones[0]) + u' \u00B1 '+str(predicted_zones[1]))
+            self.temp_highlight(self.frame_11)
         except Exception as e:
             print(e)
             traceback.print_exc()
 
     def render_map(self, img):
-        image = QImage(img, img.shape[1], img.shape[0], img.shape[1] * 3, QImage.Format_RGB888)
-        pixmap = QPixmap.fromImage(image)
-        self.map_area.setPixmap(pixmap)
-        self.map_area.setScaledContents(True)
+        try:
+            image = QImage(img, img.shape[1], img.shape[0], img.shape[1] * 3, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(image)
+            self.map_area.setPixmap(pixmap)
+            self.map_area.setScaledContents(True)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
     def alert_slider_update(self, value):
-        oa = configs.convert_famsec(float(value)/100.)
-        self.outcome_threshold_value_4.setText(oa)
+        try:
+            index = int(value)
+            self.outcome_threshold_value_4.setText(configs.AssessmentReport.INDEX2FAMSEC[index])
+            _msg = configs.MessageHelpers.pack_alert_update(value)
+            self.controlpub.publish(_msg)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
     def report_slider_update(self, value):
-        self.report_slider_value.setText(str(value))
+        try:
+            self.report_slider_value.setText(str(value))
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
     def alert_report(self):
-        self.report_button.setStyleSheet("background-color: {}".format('red'))
-        self.report_slider_counter.setText(str(np.random.randint(0, 100)))
+        try:
+            self.report_button.setStyleSheet("background-color: {}".format('red'))
+            self.report_slider_counter.setText(str(np.random.randint(0, 100)))
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
     def send_report(self):
-        if self.report_slider_value.text() == self.report_slider_counter.text():
-            self.report_button.setStyleSheet("background-color: {}".format('none'))
-            QtCore.QTimer.singleShot(5000, self.alert_report)
-            self.report_slider_counter.setText('-')
+        try:
+            if self.report_slider_value.text() == self.report_slider_counter.text():
+                self.report_button.setStyleSheet("")
+                QtCore.QTimer.singleShot(5000, self.alert_report)
+                self.report_slider_counter.setText('-')
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
 
     def send_event_button_click(self):
         try:
@@ -413,6 +475,8 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             event_msg = configs.MessageHelpers.pack_event(self.current_event_id)
             self.current_event_id = (self.current_event_id + 1) % 8
             self.controlpub.publish(event_msg)
+            self.temp_highlight(self.sendEventButton)
+
         except Exception as e:
             print(e)
             traceback.print_exc()

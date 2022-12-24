@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1542</width>
+    <width>1564</width>
     <height>747</height>
    </rect>
   </property>
@@ -1152,7 +1152,7 @@
       <rect>
        <x>240</x>
        <y>420</y>
-       <width>101</width>
+       <width>111</width>
        <height>31</height>
       </rect>
      </property>
@@ -1168,7 +1168,7 @@
     <widget class="QFrame" name="blocke_zone_frame">
      <property name="geometry">
       <rect>
-       <x>400</x>
+       <x>390</x>
        <y>420</y>
        <width>31</width>
        <height>31</height>
@@ -1187,9 +1187,9 @@
     <widget class="QLabel" name="blocked_zone_color_label">
      <property name="geometry">
       <rect>
-       <x>440</x>
+       <x>430</x>
        <y>420</y>
-       <width>101</width>
+       <width>111</width>
        <height>31</height>
       </rect>
      </property>
@@ -1306,7 +1306,7 @@
      <rect>
       <x>1140</x>
       <y>10</y>
-      <width>381</width>
+      <width>401</width>
       <height>491</height>
      </rect>
     </property>
@@ -1321,7 +1321,7 @@
       <rect>
        <x>10</x>
        <y>330</y>
-       <width>361</width>
+       <width>381</width>
        <height>121</height>
       </rect>
      </property>
@@ -1354,7 +1354,7 @@
        <rect>
         <x>10</x>
         <y>30</y>
-        <width>351</width>
+        <width>371</width>
         <height>21</height>
        </rect>
       </property>
@@ -1469,7 +1469,7 @@
       <rect>
        <x>10</x>
        <y>90</y>
-       <width>361</width>
+       <width>381</width>
        <height>81</height>
       </rect>
      </property>
@@ -1484,24 +1484,24 @@
        <rect>
         <x>10</x>
         <y>50</y>
-        <width>341</width>
+        <width>361</width>
         <height>22</height>
        </rect>
       </property>
       <property name="minimum">
-       <number>0</number>
+       <number>1</number>
       </property>
       <property name="maximum">
-       <number>100</number>
+       <number>5</number>
       </property>
       <property name="singleStep">
-       <number>25</number>
+       <number>1</number>
       </property>
       <property name="pageStep">
-       <number>25</number>
+       <number>1</number>
       </property>
       <property name="value">
-       <number>50</number>
+       <number>3</number>
       </property>
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
@@ -1516,7 +1516,7 @@
        <enum>QSlider::TicksAbove</enum>
       </property>
       <property name="tickInterval">
-       <number>25</number>
+       <number>1</number>
       </property>
      </widget>
      <widget class="QLabel" name="outcome_threshold_value_4">
@@ -1545,7 +1545,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>361</width>
+        <width>381</width>
         <height>31</height>
        </rect>
       </property>
@@ -1567,7 +1567,7 @@
       <rect>
        <x>0</x>
        <y>0</y>
-       <width>381</width>
+       <width>401</width>
        <height>41</height>
       </rect>
      </property>
@@ -1591,7 +1591,7 @@
       <rect>
        <x>10</x>
        <y>180</y>
-       <width>361</width>
+       <width>381</width>
        <height>121</height>
       </rect>
      </property>
@@ -1624,7 +1624,7 @@
        <rect>
         <x>10</x>
         <y>30</y>
-        <width>351</width>
+        <width>371</width>
         <height>21</height>
        </rect>
       </property>
@@ -1737,7 +1737,7 @@
     <widget class="QPushButton" name="assessment_button">
      <property name="geometry">
       <rect>
-       <x>90</x>
+       <x>100</x>
        <y>40</y>
        <width>201</width>
        <height>41</height>
@@ -1761,7 +1761,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1542</width>
+     <width>1564</width>
      <height>21</height>
     </rect>
    </property>
