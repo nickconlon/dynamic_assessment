@@ -1,4 +1,6 @@
 import json
+import time
+
 from PyQt5.QtWidgets import QMainWindow, QApplication
 from PyQt5.QtGui import QPixmap, QImage
 import PyQt5.QtCore as QtCore
@@ -40,8 +42,11 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.renderer = rendering.MultiAgentRendering([configs.AGENT1_ID, configs.AGENT2_ID])
             self.render_map(self.renderer.render(mode="rgb_array"))
             self.current_event_id = 0
+            self.start_time = 0
             self.sendEventButton.clicked.connect(self.send_event_button_click)
-
+            self.startSimButton.clicked.connect(self.start_sim_button_click)
+            self.time_updater_thread = QtCore.QTimer()
+            self.time_updater_thread.timeout.connect(self.time_update)
             """
             Setup the control buttons
             """
@@ -104,7 +109,7 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
 
     def temp_highlight(self, widget_func, timeout=1000, color="green"):
         widget_func.setStyleSheet("background-color: {}".format(color))
-        QtCore.QTimer.singleShot(timeout, lambda: self.sendEventButton.setStyleSheet(""))
+        QtCore.QTimer.singleShot(timeout, lambda: widget_func.setStyleSheet(""))
 
     def state_update_robot1(self, m):
         try:
@@ -187,9 +192,6 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.renderer.state_update(m)
             img = self.renderer.render(mode="rgb_array")
             self.render_map(img)
-
-            new_time = max(int(self.time_counter.text()), m[configs.MultiAgentState.STATUS_SIM_TIME])
-            self.time_counter.setText(str(new_time))
 
             new_deliveries = max(int(self.delivery_counter.text()), m[configs.MultiAgentState.STATUS_DELIVERIES])
             self.delivery_counter.setText(str(new_deliveries))
@@ -302,10 +304,25 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
 
     def end_sim_button_click(self):
         try:
-            self.stopSimButton.setStyleSheet("background-color: green")
             _msg = configs.MessageHelpers.end_sim()
             self.controlpub.publish(_msg)
             self.renderer.reset()
+            self.render_map(self.renderer.render(mode='rgb_array'))
+            self.current_event_id = 0
+            self.time_updater_thread.stop()
+            self.temp_highlight(self.stopSimButton)
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+
+    def time_update(self):
+        self.time_counter.setText(str(int(time.time() - self.start_time)))
+
+    def start_sim_button_click(self):
+        try:
+            self.start_time = time.time()
+            self.time_updater_thread.start(1000)
+            self.temp_highlight(self.startSimButton)
         except Exception as e:
             print(e)
             traceback.print_exc()
@@ -476,16 +493,19 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.current_event_id = (self.current_event_id + 1) % 8
             self.controlpub.publish(event_msg)
             self.temp_highlight(self.sendEventButton)
-
         except Exception as e:
             print(e)
             traceback.print_exc()
 
 
-qdarktheme.enable_hi_dpi()
-
-app = QApplication(sys.argv)
-qdarktheme.setup_theme()
-MainWindow = myMainWindow()
-MainWindow.show()
-app.exec_()
+if __name__ == '__main__':
+    try:
+        qdarktheme.enable_hi_dpi()
+        app = QApplication(sys.argv)
+        qdarktheme.setup_theme()
+        MainWindow = myMainWindow()
+        MainWindow.show()
+        app.exec_()
+    except Exception as e:
+        print(e)
+        traceback.print_exc()
