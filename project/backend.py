@@ -18,11 +18,12 @@ from project.assessment.assessments import StaticAssessment, DynamicAssessment
 
 
 class ControlThread(threading.Thread):
-    def __init__(self, _subscriber, _state):
+    def __init__(self, _subscriber, _state, _condition):
         threading.Thread.__init__(self)
         self.subscriber = _subscriber
         self.state = _state
         self.running = True
+        self.condition = _condition
 
     def run(self):
         print("starting control thread")
@@ -50,6 +51,8 @@ class ControlThread(threading.Thread):
                         agent_id, movement_state = configs.MessageHelpers.unpack_move_request(_data)
                         self.state.movement_state = movement_state
                     elif _topic == configs.MessageHelpers.TOPICS_GOAL_REQUEST:
+                        if self.condition == configs.Conditions.CONDITION_ET_GOA:
+                            self.state.needs_assessment = True
                         agent_id, new_goal = configs.MessageHelpers.unpack_goal_request(_data)
                         self.state.goal = new_goal
                         self.state.at_goal = False
@@ -81,7 +84,21 @@ class StateThread(threading.Thread):
         self.running = False
 
 
-def run_main(_agent_id, _mission_id, _subject_id, _color, _transition_uncertainty, _dust_uncertainty, _et_threshold):
+def run_main(_agent_id, _mission_id, _subject_id, _color,
+             _transition_uncertainty, _dust_uncertainty,
+             _prob_avoiding_crater, _prob_avoiding_zone, _et_threshold,
+             _experimental_condition):
+    print("Starting Agent:")
+    print(" ID:", _agent_id)
+    print(" Mission:", _mission_id)
+    print(" Subject:", _subject_id)
+    print(" Condition:", _experimental_condition)
+    print(" Color:", _color)
+    print(" p(T):", _transition_uncertainty)
+    print(" p(D):", _dust_uncertainty)
+    print(" p(crater avoid):", _prob_avoiding_crater)
+    print(" p(zone avoid):", _prob_avoiding_zone)
+    print(" ET thresh:", _et_threshold)
     logging.basicConfig(filename='{}/{}_{}_{}_{}.log'.format(configs.LOGGING_PATH, _agent_id, _mission_id, _subject_id, time.time()),
                         format='%(asctime)s %(message)s',
                         datefmt='%m/%d/%Y %I:%M:%S %p',
@@ -102,7 +119,7 @@ def run_main(_agent_id, _mission_id, _subject_id, _color, _transition_uncertaint
     """
     Thread for async control changes
     """
-    thread = ControlThread(control_sub, robot_state)
+    thread = ControlThread(control_sub, robot_state, _experimental_condition)
     thread.start()
 
     state_thread = StateThread(state_pub, robot_state)
@@ -114,7 +131,9 @@ def run_main(_agent_id, _mission_id, _subject_id, _color, _transition_uncertaint
     env = Environment(robot_state.location, configs.HOME,
                       _obstacles=[], _zones=[], _craters=[],
                       _state_transition=_transition_uncertainty,
-                      _zone_transition=_dust_uncertainty)
+                      _zone_transition=_dust_uncertainty,
+                      _prob_avoiding_crater=_prob_avoiding_crater,
+                      _prob_avoiding_zone=_prob_avoiding_zone)
 
     """
     Setup the control policies
@@ -140,8 +159,6 @@ def run_main(_agent_id, _mission_id, _subject_id, _color, _transition_uncertaint
     """
     assessment = StaticAssessment()
     dynamics = DynamicAssessment()
-    assessment_index = 0
-    predicted_states = np.array([[robot_state.location]])
 
     """
     Live task execution
@@ -177,9 +194,8 @@ def run_main(_agent_id, _mission_id, _subject_id, _color, _transition_uncertaint
                 robot_state.needs_assessment = False
                 robot_state.new_assessment = True
                 robot_state.assessed_goal = robot_state.goal
-
-                predicted_states = assessment_report.predicted_states
-                assessment_index = 1
+                robot_state.most_recent_report = assessment_report
+                robot_state.assessment_index = 1
 
                 label = configs.AssessmentReport.convert_famsec(robot_state.delivery_assessment)
                 if configs.AssessmentReport.FAMSEC2INDEX[label] <= robot_state.goa_alert_level:
@@ -189,7 +205,7 @@ def run_main(_agent_id, _mission_id, _subject_id, _color, _transition_uncertaint
             Navigation states - get the next action
             """
             if robot_state.movement_state == configs.MultiAgentState.START:
-                a = policy.policies[robot_state.goal].pi(state)
+                a = policy.policies[robot_state.goal].noisy_pi(state, _transition_uncertainty)
                 time.sleep(configs.SPEED_AUTONOMY)
             else:
                 a = -1
@@ -205,7 +221,6 @@ def run_main(_agent_id, _mission_id, _subject_id, _color, _transition_uncertaint
                 robot_state.collision_count += info['collisions']
                 robot_state.zone_count += info['zones']
                 robot_state.reward_count += info['rewards']
-
                 robot_state.location = tuple(env.xy_from_index(state))
 
                 if done:
@@ -216,16 +231,48 @@ def run_main(_agent_id, _mission_id, _subject_id, _color, _transition_uncertaint
                             robot_state.delivery_count += 1
                             robot_state.cargo_count -= 1
                     elif info['location'] == configs.HOME:
-                        robot_state.cargo_count = min(3, robot_state.cargo_count+3)
+                        robot_state.cargo_count = min(configs.CARGO_RESUPPLY, robot_state.cargo_count+configs.CARGO_RESUPPLY)
 
-                if configs.ENABLE_ET_GOA:
+                if robot_state.zone_count > configs.CRATERS_TO_BREAKING:
+                    print("Broken :(")
+                    robot_state.needs_rescue = True
+                    x1 = [env.xy_from_index(state)[0], configs.LOCATIONS[configs.HOME].position[0]]
+                    y1 = [env.xy_from_index(state)[1], configs.LOCATIONS[configs.HOME].position[1]]
+                    from scipy.interpolate import interp1d
+                    f = interp1d(x1, y1)
+                    x = np.linspace(x1[0], x1[1], num=15, endpoint=True)
+                    x_flipped = np.flip(x)
+                    #for k in range(len(x)):
+                    #    time.sleep(0.5)
+                    #    robot_state.location = tuple([x_flipped[k], f(x_flipped[k])])
+                    #    robot_state.color = (255, 0, 0)
+                    for k in range(len(x)):
+                        time.sleep(1.0)
+                        robot_state.location = tuple([x[k], f(x[k])])
+                        robot_state.color = (255, 0, 0)
+                    state = env.reset()
+                    robot_state.color = _color
+                    robot_state.movement_state = configs.MultiAgentState.STOP
+                    robot_state.cargo_count = configs.CARGO_RESUPPLY
+                    robot_state.zone_count = 0
+                    robot_state.collision_count = 0
+                    robot_state.location = tuple(env.xy_from_index(state))
+                    robot_state.needs_rescue = False
+
+                if _experimental_condition == configs.Conditions.CONDITION_ET_GOA:
                     needs_assessment = False
-                    if assessment_index >= predicted_states.shape[1] or np.count_nonzero(np.isnan(predicted_states[:, assessment_index])):
+                    if robot_state.most_recent_report is None:
+                        print('assessing due to lack of data')
+                        needs_assessment = True
+                    elif robot_state.assessment_index >= robot_state.most_recent_report.predicted_states.shape[1]:
+                        print('assessing due to lack of data')
+                        needs_assessment = True
+                    elif np.count_nonzero(np.isnan(robot_state.most_recent_report.predicted_states[:, robot_state.assessment_index])):
                         print('assessing due to lack of data')
                         needs_assessment = True
                     else:
                         try:
-                            predicted_state_t = copy.deepcopy(predicted_states[:, assessment_index])
+                            predicted_state_t = copy.deepcopy(robot_state.most_recent_report.predicted_states[:, robot_state.assessment_index])
                             predicted_state_t = predicted_state_t[~np.isnan(predicted_state_t).any(axis=1), :]
                             p_expected = dynamics.tail(predicted_state_t, env.xy_from_index(state))
                             print("tail: {:.2f}".format(p_expected))
@@ -244,7 +291,7 @@ def run_main(_agent_id, _mission_id, _subject_id, _color, _transition_uncertaint
                         if p_expected <= _et_threshold:
                             needs_assessment = True
                             print('assessing due to surprising data')
-                    assessment_index += 1
+                    robot_state.assessment_index += 1
                     robot_state.needs_assessment = needs_assessment
 
             """
@@ -280,6 +327,8 @@ def run_main(_agent_id, _mission_id, _subject_id, _color, _transition_uncertaint
 
 
 if __name__ == '__main__':
+    settings = configs.read_configs('ui__select/settings.yaml')
+
     parser = argparse.ArgumentParser(prog='test', description='')
     parser.add_argument('-a', '--agentid', type=int, default=1)
     parser.add_argument('-m', '--missionid', type=int, default=1)

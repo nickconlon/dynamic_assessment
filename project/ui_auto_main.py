@@ -10,11 +10,11 @@ import traceback
 import numpy as np
 
 sys.path.append('../')
-import project.ui_multi_agent_distractor as ui
+import project.ui__auto.ui_auto as ui
 import project.communications.zmq_subscriber as subscriber
 from project.communications.zmq_publisher import ZmqPublisher
 import project.multiagent_configs as configs
-import multi_agent_environment as rendering
+import project.rendering_environment as rendering
 
 
 class Generic_ZeroMQ_Listener(QtCore.QObject):
@@ -75,13 +75,6 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.stopSimButton.clicked.connect(self.end_sim_button_click)
 
             """
-            Setup the assessment listener thread
-            """
-            self.assessment_button.clicked.connect(self.self_assessment_button_click)
-            self.thread = QtCore.QThread()
-            QtCore.QTimer.singleShot(0, self.thread.start)
-
-            """
             Setup the state listener thread
             """
             self.stateThread = QtCore.QThread()
@@ -95,13 +88,6 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             Setup the confidence alert stuff
             """
             self.operator_alert_slider.valueChanged.connect(self.alert_slider_update)
-
-            """
-            Setup the distraction task stuff
-            """
-            self.report_button.clicked.connect(self.send_report)
-            self.report_slider.valueChanged.connect(self.report_slider_update)
-            QtCore.QTimer.singleShot(5000, self.alert_report)
 
         except Exception as e:
             print(e)
@@ -134,6 +120,9 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
                 self.stopControlButton.setStyleSheet("background-color: green")
             elif m[configs.MultiAgentState.STATUS_STATE] == configs.MultiAgentState.START:
                 self.startControlButton.setStyleSheet("background-color: green")
+
+            if m[configs.MultiAgentState.STATUS_NEEDS_RESCUE]:
+                self.renderer.previous_positions[m[configs.MultiAgentState.STATUS_AGENTID]] = []
 
             if m[configs.MultiAgentState.STATUS_NEW_ASSESSMENT]:
                 assessment_msg = {'rewards': m[configs.MultiAgentState.STATUS_REWARD_GOA],
@@ -379,29 +368,9 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             print(e)
             traceback.print_exc()
 
-    #
-    # Self-assessment stuff
-    #
-    def self_assessment_button_click(self):
-        try:
-            self.assessment_button.setStyleSheet("background-color: green")
-            oa_zones = 5
-            oa_hits = 5
-            for agent_id in [configs.AGENT1_ID, configs.AGENT2_ID]:
-                _msg = configs.MessageHelpers.assessment_request(agent_id, 0, oa_zones, oa_hits)
-                print(_msg)
-                self.controlpub.publish(_msg)
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-
-    def clear_assessment_button(self):
-        self.assessment_button.setStyleSheet("")
-
     def agent1_assessment_update(self, msg):
         """ Update the assessment display for agent 1 """
         try:
-            self.clear_assessment_button()
             target_goal = msg['target']
             collisions = msg['collisions']
             zones = msg['zones']
@@ -421,7 +390,6 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
     def agent2_assessment_update(self, msg):
         """ Update the assessment display for agent 2 """
         try:
-            self.clear_assessment_button()
             target_goal = msg['target']
             collisions = msg['collisions']
             zones = msg['zones']
@@ -454,31 +422,6 @@ class myMainWindow(QMainWindow, ui.Ui_MainWindow):
             self.outcome_threshold_value_4.setText(configs.AssessmentReport.INDEX2FAMSEC[index])
             _msg = configs.MessageHelpers.pack_alert_update(value)
             self.controlpub.publish(_msg)
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-
-    def report_slider_update(self, value):
-        try:
-            self.report_slider_value.setText(str(value))
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-
-    def alert_report(self):
-        try:
-            self.report_button.setStyleSheet("background-color: {}".format('red'))
-            self.report_slider_counter.setText(str(np.random.randint(0, 100)))
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-
-    def send_report(self):
-        try:
-            if self.report_slider_value.text() == self.report_slider_counter.text():
-                self.report_button.setStyleSheet("")
-                QtCore.QTimer.singleShot(5000, self.alert_report)
-                self.report_slider_counter.setText('-')
         except Exception as e:
             print(e)
             traceback.print_exc()

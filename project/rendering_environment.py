@@ -1,5 +1,6 @@
 import numpy as np
 import environment as single_agent_environment
+import traceback
 import cv2
 import copy
 import time
@@ -20,18 +21,94 @@ class Agent:
         self.goal_label = goal_label
         self.policy = policy.q_policies(policy_paths, policy_labels)
         self.env = single_agent_environment.Environment(self.current_location, self.goal_label,
-                                                        _obstacles=_obstacles, _zones=_zones, _craters=_craters)
+                                                        _obstacles=_obstacles, _zones=_zones, _craters=_craters,
+                                                        _zone_transition=0.1)
         self.done = False
         self.static_assessment = StaticAssessment()
         self.dynamic_assessment = DynamicAssessment()
         self.zones = 0
         self.craters = 0
+        self.assessments = 0
+
+        self.predicted_state = np.array([[self.current_location]])
+        self.assessment_index = 1
+        self.et_threshold = 0.05
+
+        self.predicted_zones_seen = np.array([[0]])
+        self.predicted_craters_seen = np.array([[0]])
+        self.actual_craters_seen = {0: 0}
+        self.actual_zones_seen = {0: 0}
+
+        self.timestep = 0
+
+    def dynamic_assess(self, goals):
+        should_assess = False
+        if self.assessment_index >= self.predicted_state.shape[1] or np.count_nonzero(
+                np.isnan(self.predicted_state[:, self.assessment_index])):
+            should_assess = True
+            print('assessing due to lack of data')
+        else:
+            predicted_craters_t = self.predicted_craters_seen[:, self.assessment_index+1]
+            observed_craters_t = self.actual_craters_seen[self.timestep]
+            p_craters = self.dynamic_assessment.sigma_bounds_1d(predicted_craters_t, observed_craters_t)
+
+            predicted_zones_t = self.predicted_zones_seen[:, self.assessment_index + 1]
+            observed_zones_t = self.actual_zones_seen[self.timestep]
+            p_zones = self.dynamic_assessment.sigma_bounds_1d(predicted_zones_t, observed_zones_t)
+            p_expected = p_craters | p_zones
+            '''
+            try:
+                predicted_state_t = copy.deepcopy(self.predicted_state[:, self.assessment_index])
+                predicted_state_t = predicted_state_t[~np.isnan(predicted_state_t).any(axis=1), :]
+                p_expected = self.dynamic_assessment.tail(predicted_state_t, self.current_location)
+                print("tail: {:.2f}".format(p_expected))
+            except Exception as e:
+                p_expected = 0.0
+                print(e)
+                traceback.print_exc()
+                '''
+            if p_expected <= self.et_threshold:
+                should_assess = True
+                print('assessing due to surprising data')
+
+        if should_assess:
+            self.assessment_index = 0
+            return self.choose_goal(goals)
+        self.assessment_index += 1
+        return None
+
+    def choose_goal(self, goals, printing=True):
+        self.assessments += 1
+        scores = np.zeros(3)
+        reports = [None, None, None]
+        for goal_idx in range(3):
+            goa_report = self._assess(goals[goal_idx])
+            reports[goal_idx] = goa_report
+            scores[goal_idx] = goa_report.delivery_goa
+
+        best_zone_idx = np.argmax(scores)
+        report = reports[best_zone_idx]
+        self.predicted_state = report.predicted_states
+        self.predicted_zones_seen = report.predicted_dust_fov
+        self.predicted_craters_seen = report.predicted_craters_fov
+        mu_craters = report.mu_craters
+        std_craters = report.std_craters
+        mu_zones = report.mu_zones
+        std_zones = report.std_zones
+
+        if printing:
+            print('The likelihood of successful delivery to area {}: {}'.format(best_zone_idx,
+                                                                                configs.AssessmentReport.convert_famsec(
+                                                                                    scores[best_zone_idx])))
+            print('Because the rover will hit:')
+            print(' {}'.format(int(mu_craters)) + u" \u00B1 " + '{} craters'.format(int(std_craters)))
+            print(' {}'.format(int(mu_zones)) + u" \u00B1 " + '{} zones'.format(int(std_zones)))
+            print('\n')
+            print(scores)
+        return best_zone_idx, [configs.AssessmentReport.convert_famsec(s) for s in scores]
 
     def event(self, new_craters=None, new_zones=None, new_goal_label=None):
-        self.env.change_event(new_craters=new_craters,
-                              new_zones=new_zones,
-                              new_goal_label=new_goal_label)
-
+        self.env.change_event(new_craters=new_craters, new_zones=new_zones, new_goal_label=new_goal_label)
         if new_goal_label is not None:
             self.goal_label = new_goal_label
 
@@ -42,6 +119,9 @@ class Agent:
         self.done |= _done
         self.zones += _info['zones']
         self.craters += _info['collisions']
+        self.actual_craters_seen[_info['times']] = _info['craters_seen']
+        self.actual_zones_seen[_info['times']] = _info['zones_seen']
+        self.timestep = _info['times']
 
     def reset(self, location):
         self.current_location = copy.deepcopy(location)
@@ -49,6 +129,8 @@ class Agent:
         self.env.reset(state=location)
         self.zones = 0
         self.craters = 0
+        self.assessment_index = 1
+        self.assessments = 0
 
     def is_done(self):
         return self.done
@@ -59,24 +141,25 @@ class Agent:
         s.goal = self.goal_label
         return s.state_update_message()
 
-    def assess(self, goal_label):
-        rewards_oa, collision_oa, zones_oa, predicted_states = self.static_assessment.run_goa_assessment(
+    def _assess(self, goal_label):
+        copy_env = copy.deepcopy(self.env)
+        copy_env.goal = copy.deepcopy(configs.LOCATIONS[goal_label].position)
+        report = self.static_assessment.run_another_assessment(
             self.policy.policies[goal_label],
-            copy.deepcopy(self.env),
+            copy_env,
             self.current_location,
             configs.OA_ROLLOUTS,
-            [45, 5, 5],
-            [0, 0, 0],
             configs.STATE_UNCERTAINTY)
-        return rewards_oa, collision_oa, zones_oa, predicted_states
+
+        return report
 
     def rollout(self, goal_label):
-        rewards, collisions, zones, states, times = self.static_assessment.rollout(
+        report = self.static_assessment.rollout_all(
             self.policy.policies[goal_label],
             copy.deepcopy(self.env),
             self.current_location,
             25, 0.9)
-        return collisions, zones
+        return report
 
 
 class MultiAgentRendering(single_agent_environment.Environment):
@@ -125,37 +208,27 @@ class MultiAgentRendering(single_agent_environment.Environment):
         """
         _image = np.copy(self.base_image)
         _image = cv2.cvtColor(_image, cv2.COLOR_BGR2RGB)
-        scale = 10
-        colors = {1: configs.AGENT1_COLOR, 2: configs.AGENT2_COLOR, 3: configs.AGENT3_COLOR}
 
         _, _, _image = self.add_convex_hull(_image, self.zones, (22, 22, 138))
         _, _, _image = self.add_convex_hull(_image, self.craters, (255, 0, 0))
 
         for obstacle in self.obstacles:
-            _image = cv2.circle(_image, (obstacle.xy[0] * scale, obstacle.xy[1] * scale), obstacle.r * scale,
+            _image = cv2.circle(_image, (obstacle.xy[0] * self.scale, obstacle.xy[1] * self.scale), obstacle.r * self.scale,
                                 obstacle.color, thickness=2)
-        '''
-        for zone in self.zones:
-            _image = cv2.circle(_image, (zone.xy[0] * scale, zone.xy[1] * scale), zone.r * scale, zone.color,
-                                thickness=2)
 
-        for crater in self.craters:
-            _image = cv2.circle(_image, (crater.xy[0] * scale, crater.xy[1] * scale), crater.r * scale, crater.color,
-                                thickness=2)
-        '''
-        _image = cv2.rectangle(_image, (self.minX * scale, self.minY * scale),
-                               (self.maxX * scale, self.maxY * scale), (0, 0, 0), thickness=2)
+        _image = cv2.rectangle(_image, (self.minX * self.scale, self.minY * self.scale),
+                               (self.maxX * self.scale, self.maxY * self.scale), (0, 0, 0), thickness=2)
 
-        _image = cv2.circle(_image, (self.pos_home[0] * scale, self.pos_home[1] * scale), self.goal_eps * scale,
+        _image = cv2.circle(_image, (self.pos_home[0] * self.scale, self.pos_home[1] * self.scale), self.goal_eps * self.scale,
                             self.home_color, thickness=1)
-        _image = cv2.putText(_image, 'H', (self.pos_home[0] * scale - 10, self.pos_home[1] * scale + 10),
+        _image = cv2.putText(_image, 'H', (self.pos_home[0] * self.scale - 10, self.pos_home[1] * self.scale + 10),
                              cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
 
         for g in [configs.AREA_1, configs.AREA_2, configs.AREA_3]:
             pos = configs.LOCATIONS[g].position
-            _image = cv2.circle(_image, (pos[0] * scale, pos[1] * scale), self.goal_eps * scale,
+            _image = cv2.circle(_image, (pos[0] * self.scale, pos[1] * self.scale), self.goal_eps * self.scale,
                                 self.goal_color, thickness=1)
-            _image = cv2.putText(_image, g.split('_')[1], (pos[0] * scale - 10, pos[1] * scale + 10),
+            _image = cv2.putText(_image, g.split('_')[1], (pos[0] * self.scale - 10, pos[1] * self.scale + 10),
                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
 
         for agent_id in self.agent_ids:
@@ -163,19 +236,19 @@ class MultiAgentRendering(single_agent_environment.Environment):
                 agent_state = self.states[agent_id]
                 if agent_state:
                     agent_location = agent_state[configs.MultiAgentState.STATUS_LOCATION]
-                    agent_color = colors[agent_id]
+                    agent_color = agent_state[configs.MultiAgentState.STATUS_COLOR]
                     agent_goal = agent_state[configs.MultiAgentState.STATUS_GOAL]
                     agent_goal = configs.LOCATIONS[agent_goal].position
                     self.previous_positions[agent_id].append(agent_location)
 
                     for p in self.previous_positions[agent_id]:
-                        cv2.circle(_image, (p[0] * scale, p[1] * scale), 6, agent_color, thickness=-1)
+                        cv2.circle(_image, (p[0] * self.scale, p[1] * self.scale), 6, agent_color, thickness=-1)
 
-                    _image = cv2.circle(_image, (agent_location[0] * scale, agent_location[1] * scale), 5, (0, 0, 0),
+                    _image = cv2.circle(_image, (agent_location[0] * self.scale, agent_location[1] * self.scale), 5, (0, 0, 0),
                                         thickness=-1)
                     _image = self.draw_shapes(_image, agent_location, agent_color)
 
-                    _image = cv2.circle(_image, (agent_goal[0] * scale, agent_goal[1] * scale), self.goal_eps * scale,
+                    _image = cv2.circle(_image, (agent_goal[0] * self.scale, agent_goal[1] * self.scale), self.goal_eps * self.scale,
                                         self.goal_color, thickness=3)
 
         _image = _image[0:600, 0:600, :]
