@@ -8,7 +8,7 @@ import traceback
 from project.assessment.assessments import StaticAssessment, DynamicAssessment
 from project.environment import Environment
 from project.multiagent_configs import Obstacle
-import project.configs as configs
+import project.multiagent_configs as configs
 from project.solvers.q_learning_policy import q_policy
 
 
@@ -85,8 +85,8 @@ if __name__ == '__main__':
     obstructions = []
     zones = []
     craters = []
-    env = Environment(initial_state, goal_location, obstructions, _zones=zones, _craters=craters)
-    policy = q_policy('../../'+configs.POLICY)
+    env = Environment(initial_state, configs.AREA_1, _obstacles=obstructions, img_path='../../imgs/mars.jpg', _zones=zones, _craters=craters)
+    policy = q_policy('../../'+configs.LOCATIONS[configs.AREA_1].policy)
 
     sa = StaticAssessment()
     da = DynamicAssessment()

@@ -47,11 +47,55 @@ class StaticAssessment(CompetencyAssessmentBase):
                 rewards[i] += info['rewards']
                 if done:
                     if collisions[i] < 5:
-                        deliveries[i] += 1
+                        deliveries[i] = 1
+                    else:
+                        deliveries[1] = -1
                     break
 
         # np.save('./data/noise_discrete.npy', predictions)
         return rewards, collisions, zones, predictions, times, deliveries
+
+    @staticmethod
+    def rollout_all(policy, env, state, num_rollouts, transition_uncertainty):
+        max_length = 250
+
+        crater_collisions = np.zeros(num_rollouts)
+        zone_collisions = np.zeros(num_rollouts)
+        delivery_predictions = np.ones(num_rollouts)*-1
+        zones_seen_at_time = np.zeros((num_rollouts, max_length, 1))
+        craters_seen_at_time = np.zeros((num_rollouts, max_length, 1))
+
+        state_predictions = np.zeros((num_rollouts, max_length, 2)) * np.nan
+        for i in range(num_rollouts):
+            s = env.reset(state=state)
+            state_predictions[i, 0, :] = env.xy_from_index(s)
+            zones_seen_at_time[i, 0, 0] = 0
+            craters_seen_at_time[i, 0, 0] = 0
+            for j in range(max_length - 1):
+                # a = policy.pi(s)
+                action = policy.noisy_pi(s, transition_uncertainty)
+                s, reward, done, info = env.step(action)
+                state_predictions[i, j + 1, :] = env.xy_from_index(s)
+
+                crater_collisions[i] += info['collisions']
+                zone_collisions[i] += info['zones']
+                zones_seen_at_time[i, j+1, 0] = info['zones_seen']
+                craters_seen_at_time[i, j+1, 0] = info['craters_seen']
+                if done:
+                    if crater_collisions[i] < 5:
+                        delivery_predictions[i] = 1
+                    else:
+                        delivery_predictions[i] = -1
+                    break
+
+        # np.save('./data/noise_discrete.npy', predictions)
+        rollout_report = {'crater_collisions': crater_collisions,
+                          'zone_collisions': zone_collisions,
+                          'state_predictions': state_predictions,
+                          'delivery_predictions': delivery_predictions,
+                          'zones_seen_at_time': zones_seen_at_time,
+                          'craters_seen_at_time': craters_seen_at_time}
+        return rollout_report
 
     def run_assessment(self, policy, env, state, num_rollouts, z_star, transition_uncertainty):
         rewards, collisions, zones, states, times, deliveries = self.rollout(policy, env, state, num_rollouts, transition_uncertainty)
@@ -69,20 +113,25 @@ class StaticAssessment(CompetencyAssessmentBase):
         return collisions_oa, np.mean(collisions), np.std(collisions), zones_oa, np.mean(zones), np.std(zones), states
 
     def run_another_assessment(self, policy, env, state, num_rollouts, transition_uncertainty):
-        rewards, collisions, zones, states, times, deliveries = self.rollout(policy, env, state, num_rollouts,
-                                                                             transition_uncertainty)
+        report = self.rollout_all(policy, env, state, num_rollouts, transition_uncertainty)
+
         partition = np.array([-2, 0, 2])
         z_star = 2
-        deliveries_oa = self.famsec.generalized_outcome_assessment(deliveries, partition, z_star)
+        deliveries_oa = self.famsec.generalized_outcome_assessment(report['delivery_predictions'], partition, z_star)
 
-        report = configs.AssessmentReport()
-        report.delivery_goa = deliveries_oa
-        report.mu_craters = int(np.around(np.mean(collisions)))
-        report.std_craters = int(np.around(np.std(collisions)))
-        report.mu_zones = int(np.around(np.mean(zones)))
-        report.std_zones = int(np.around(np.std(zones)))
-        report.predicted_states = states
-        return report
+        goa_report = configs.AssessmentReport()
+        goa_report.delivery_goa = deliveries_oa
+        goa_report.mu_craters = int(np.around(np.mean(report['crater_collisions'])))
+        goa_report.std_craters = int(np.around(np.std(report['crater_collisions'])))
+        goa_report.mu_zones = int(np.around(np.mean(report['zone_collisions'])))
+        goa_report.std_zones = int(np.around(np.std(report['zone_collisions'])))
+        goa_report.predicted_dust_hit = report['zone_collisions']
+        goa_report.predicted_craters_hit = report['crater_collisions']
+        goa_report.predicted_states = report['state_predictions']
+        goa_report.predicted_craters_fov = report['craters_seen_at_time']
+        goa_report.predicted_dust_fov = report['zones_seen_at_time']
+
+        return goa_report
 
     def run_goa_assessment(self, policy, env, state, num_rollouts, z_stars, current_counts, transition_uncertainty) -> object:
         rewards, collisions, zones, states, times, deliveries = self.rollout(policy, env, state, num_rollouts, transition_uncertainty)
@@ -293,7 +342,7 @@ class DynamicAssessment(CompetencyAssessmentBase):
             if np.linalg.cond(sigma) < 1 / sys.float_info.epsilon:
                 pass
             else:
-                sigma = np.array([[1., 0], [0, 1]])
+                sigma = np.array([[2., 0], [0, 2]])
         except Exception as e:
             print(e)
             print('\nsigma \n', sigma)
@@ -304,6 +353,19 @@ class DynamicAssessment(CompetencyAssessmentBase):
         m_dist_x = np.dot(m_dist_x, (x - mu))
 
         return 1 - stats.chi2.cdf(m_dist_x, len(actual))
+
+    @staticmethod
+    def sigma_bounds_1d(_predicted, _actual, threshold=2):
+        data = copy.deepcopy(_predicted)
+        data = np.squeeze(data, axis=1)
+        H0 = copy.deepcopy(_actual)
+        mu = np.mean(data)
+        sigma = np.std(data)
+        if abs(H0-mu) <= threshold*sigma:
+            return 1
+        else:
+            return 0
+
 '''
 d = DynamicAssessment()
 pred = np.ones((10,2))*np.array([10,11])

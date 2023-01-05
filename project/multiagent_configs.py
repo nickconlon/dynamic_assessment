@@ -20,15 +20,14 @@ ACTION_PORT = '5555'
 CONTROL_TOPIC = 'CONTROL'
 CONTROL_PORT = '5554'
 
-ENABLE_ET_GOA = True
-ENABLE_GOA = True
-
 LOGGING_PATH = './data/logs'
 SCENARIO_PATH = './data/scenarios'
 
 CARGO_RESUPPLY = 3
 
 SCENARIO_ID = 7
+
+CRATERS_TO_BREAKING = 5
 
 #
 # Agent IDs and colors
@@ -64,6 +63,12 @@ ET_THRESHOLD = 0.05
 # Control delays
 #
 SPEED_AUTONOMY = 0.5
+
+
+class Conditions:
+    CONDITION_ET_GOA = 'CONDITION_ET_GOA'
+    CONDITION_REQUEST_GOA = 'CONDITION_REQUEST_GOA'
+    CONDITION_NO_GOA = 'CONDITION_NO_GOA'
 
 
 class Location:
@@ -109,12 +114,17 @@ class AssessmentReport:
                      'Highly Likely': [0.90, 1.1]}
 
     def __init__(self):
+        self.goal = None
         self.delivery_goa = 0
         self.mu_craters = 0
         self.std_craters = 0
         self.mu_zones = 0
         self.std_zones = 0
-        self.predicted_states = []
+        self.predicted_states = np.zeros((1,2))
+        self.predicted_dust_fov = np.zeros(1)
+        self.predicted_dust_hit = np.zeros(1)
+        self.predicted_craters_fov = np.zeros(1)
+        self.predicted_craters_hit = np.zeros(1)
 
     @staticmethod
     def convert_famsec(prob):
@@ -151,6 +161,8 @@ class MultiAgentState:
     STATUS_ZONES_GOA = 'STATUS_TIME_GOA'
     STATUS_DELIVERIES_GOA = 'STATUS_DELIVERIES_GOA'
     STATUS_NEW_ASSESSMENT = 'STATUS_NEW_ASSESSMENT'
+    STATUS_NEEDS_RESCUE = 'STATUS_NEEDS_RESCUE'
+    STATUS_FOV = 'STATUS_FOV'
 
     # constant state enums
     STOP = 'STOP'
@@ -159,27 +171,43 @@ class MultiAgentState:
     FULL_ASSESSMENT = 'FULL_ASSESSMENT'
     END_SIM = 'END_SIM'
 
-    def __init__(self, agent_id, start_time, agent_color):
+    def __init__(self, agent_id, start_time, agent_color, fov=6):
         self.agent_id = agent_id  # AGENTxx
         self.movement_state = MultiAgentState.STOP  # START/STOP
         self.location = [0, 0]  # (X,Y)
         self.goal = HOME  # AREA1, AREA2, AREA3, HOME
+        self.fov = fov
         self.color = agent_color  # RED, BLUE, GREEN
         self.sim_start_time = start_time  # Integer
         self.sim_current_time = 0  # Integer
-        self.needs_assessment = False
-        self.needs_end_sim = False
-        self.at_goal = True
-        self.delivery_count = 0
-        self.cargo_count = CARGO_RESUPPLY
 
-        self.goa_alert_level = 0.5
+        # True if the sim should end, False otherwise
+        self.needs_end_sim = False
+        # True if the agent is at the current goal, False otherwise
+        self.at_goal = True
+        # How much cargo the agent delivered so far
+        self.delivery_count = 0
+        # How much cargo the agent currently holds
+        self.cargo_count = CARGO_RESUPPLY
+        # True if the agent needs rescue, False otherwise
+        self.needs_rescue = False
+
+        # The ID of the current event, -1 otherwise
         self.current_event_id = -1
 
-        self.assessed_goal = HOME
-
+        # True if the agent needs an assessment, False otherwise
+        self.needs_assessment = False
+        # True if there is a new assessment to display, False otherwise
         self.new_assessment = False
+        # The GOA level the agent should stop movement at
+        self.goa_alert_level = 0.5
+        # The last assessed goal or the goal to assess
+        self.assessed_goal = HOME
+        # The GOA value of the most recent assessment
         self.delivery_assessment = 1
+        # The full assessment report of the most recent assessment
+        self.most_recent_report = None
+        self.assessment_index = 0 #TODO or 1
 
         self.reward_assessment_threshold = 0
         self.reward_assessment = 1  # String
@@ -202,6 +230,7 @@ class MultiAgentState:
                             self.STATUS_HITS: self.collision_count,
                             self.STATUS_GOAL: self.goal,
                             self.STATUS_SIM_TIME: self.sim_current_time,
+                            self.STATUS_NEEDS_RESCUE: self.needs_rescue,
                             self.STATUS_REWARDS: self.reward_count,
                             self.STATUS_ASSESSED_GOAL: self.assessed_goal,
                             self.STATUS_ZONES: self.zone_count,
@@ -215,6 +244,7 @@ class MultiAgentState:
                             self.STATUS_DELIVERIES: self.delivery_count,
                             self.STATUS_CARGO_COUNT: self.cargo_count,
                             self.STATUS_NEW_ASSESSMENT: self.new_assessment,
+                            self.STATUS_FOV: self.fov,
                             self.STATUS_DELIVERIES_GOA: AssessmentReport.convert_famsec(self.delivery_assessment)}
         return single_agent_msg
 
@@ -338,32 +368,46 @@ class Obstacle:
             return False
 
 
-def create_new_craters():
-    lx = np.random.randint(10, 50)
-    ly = np.random.randint(10, 50)
-    sx = np.random.randint(2, 4)
-    sy = np.random.randint(2, 4)
-    craters = [Obstacle(int(x), int(y), 1, CRATER_COLOR) for (x, y) in
-               zip(np.random.normal(loc=lx, scale=sx, size=25), np.random.normal(loc=ly, scale=sy, size=25))]
+def create_new_craters(size,
+                       lxrange=(20, 50),
+                       lyrange=(10, 30),
+                       sxrange=(2, 8),
+                       syrange=(2, 8)):
+    lx = np.random.randint(*lxrange)
+    ly = np.random.randint(*lyrange)
+    sx = np.random.randint(*sxrange)
+    sy = np.random.randint(*syrange)
+    craters = [Obstacle(int(x), int(y), 2, CRATER_COLOR) for (x, y) in
+               zip(np.random.normal(loc=lx, scale=sx, size=size), np.random.normal(loc=ly, scale=sy, size=size))]
 
     sx = sx + 3
-    sy = sx + 3
+    sy = sy + 3
     zones = [Obstacle(int(x), int(y), 2, ZONE_COLOR) for (x, y) in
-             zip(np.random.normal(loc=lx, scale=sx, size=25), np.random.normal(loc=ly, scale=sy, size=25))]
+             zip(np.random.normal(loc=lx, scale=sx, size=size), np.random.normal(loc=ly, scale=sy, size=size))]
     return craters, zones
 
 
-def save_scenarios(num_runs):
-    for i in range(num_runs):
-        craters, zones = create_new_craters()
-        craters_out = np.zeros((len(craters), 3))
-        zones_out = np.zeros((len(zones), 3))
-        for c in range(len(craters)):
-            craters_out[c] = [*craters[c].xy, craters[c].r]
-        for z in range(len(zones)):
-            zones_out[z] = [*zones[z].xy, zones[z].r]
-        np.save('./data/scenarios/craters_scenario_{}.npy'.format(i), craters_out)
-        np.save('./data/scenarios/zones_scenario_{}.npy'.format(i), zones_out)
+class ScenarioMaker:
+    def __init__(self, num_scenarios, rendereing, plotting):
+        self.num_scenarios = num_scenarios
+        self.save_path = './data/scenarios/'
+        self.renderer = rendereing
+        self.plotting = plotting
+
+    def save_scenarios(self):
+        for i in range(self.num_scenarios):
+            craters, zones = create_new_craters()
+            self.renderer.change_event(new_zones=zones, new_craters=craters)
+            img = self.renderer.render(mode='rgb_array')
+            craters_out = np.zeros((len(craters), 3))
+            zones_out = np.zeros((len(zones), 3))
+            for c in range(len(craters)):
+                craters_out[c] = [*craters[c].xy, craters[c].r]
+            for z in range(len(zones)):
+                zones_out[z] = [*zones[z].xy, zones[z].r]
+            np.save('{}craters_scenario_{}.npy'.format(self.save_path, i), craters_out)
+            np.save('{}zones_scenario_{}.npy'.format(self.save_path, i), zones_out)
+            self.plotting.imsave('{}img_scenario_{}.png'.format(self.save_path, i), img)
 
 
 def read_scenarios(scenario_id):

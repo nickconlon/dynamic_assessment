@@ -6,7 +6,7 @@ import matplotlib.transforms as transforms
 from scipy import stats
 
 from project.solvers.q_learning_policy import q_policy
-import project.configs as configs
+import project.multiagent_configs as configs
 import project.environment as Env
 from project.assessment.assessments import StaticAssessment
 from triggers_test import empirical_transition_function
@@ -69,8 +69,8 @@ T, S0 = empirical_transition_function()
 s = configs.LOCATIONS[configs.HOME].position
 g = configs.LOCATIONS[configs.AREA_1].position
 
-env = Env.Environment(s, g)
-policy = q_policy(configs.LOCATIONS[configs.AREA_1].policy)
+env = Env.Environment(s, configs.AREA_1)
+policy = q_policy('../../'+configs.LOCATIONS[configs.AREA_1].policy)
 
 xs = []
 si_actual = []
@@ -125,7 +125,6 @@ def surprise_index_trigger(_actual, _predicted, ax):
     sig = np.std(_predicted)
     x = stats.norm(mu, sig)
     d = x.pdf(_actual)
-    print(x.cdf(_))
     plt.hist(d)
     plt.show()
     '''
@@ -150,12 +149,11 @@ def surprise_index_trigger(_actual, _predicted, ax):
     '''
     return 0#surprise
 
-zones = []#Env.Obstacle(int(x), int(y), 3, configs.ZONE_COLOR) for (x, y) in
-         #zip(np.random.normal(loc=20, scale=5, size=100), np.random.normal(loc=20, scale=5, size=100))]
+zones = []
 craters = []
 env.change_event(new_zones=zones, new_craters=craters)
 sa = StaticAssessment()
-rewards, collisions, predictions, times = sa.rollout(policy, env, s, 20, 0.5)
+rewards, collisions, zones, predictions, times, deliveries = sa.rollout(policy, env, s, 20, 0.5)
 print("Reward: ", np.mean(rewards))
 prediction_index = 2
 

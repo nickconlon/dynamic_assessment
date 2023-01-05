@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import copy
 
-import project.configs as configs
+import project.multiagent_configs as configs
 import project.environment as Env
 from project.solvers.q_learning_policy import q_policy
 from project.assessment.assessments import StaticAssessment
@@ -14,11 +14,11 @@ goal_state = configs.AREA_3
 def empirical_transition_function():
     s0 = configs.LOCATIONS[initial_state].position
     g = configs.LOCATIONS[goal_state].position
-    env = Env.Environment(s0, g)
+    env = Env.Environment(s0, goal_state)
     gidx = env.index_from_xy(*g)
     s0idx = env.index_from_xy(*s0)
 
-    policy = q_policy(configs.LOCATIONS[goal_state].policy)
+    policy = q_policy('../../'+configs.LOCATIONS[goal_state].policy)
     T = np.zeros((2500, 2500))
 
     for x in range(50):
@@ -67,7 +67,7 @@ if __name__=='__main__':
 
     fig, (a1, a2, a3) = plt.subplots(nrows=1, ncols=3)
 
-    env = Env.Environment(s, g)
+    env = Env.Environment(s, goal_state)
     policy = q_policy(configs.LOCATIONS[goal_state].policy)
 
     zones = []
