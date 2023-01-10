@@ -216,11 +216,13 @@ class MultiAgentState:
         self.collision_assessment_threshold = 0  # String
         self.collision_assessment = 1  # String
         self.collision_count = 0  # Integer
+        self.current_craters_seen = 0
         self.predicted_collision_count = (0, 0)
 
         self.zone_assessment_threshold = 0  # String
         self.zone_assessment = 1  # String
         self.zone_count = 0
+        self.current_zones_seen = 0
         self.predicted_zone_count = (0, 0)
 
     def state_update_message(self):
@@ -380,8 +382,8 @@ def create_new_craters(size,
     craters = [Obstacle(int(x), int(y), 2, CRATER_COLOR) for (x, y) in
                zip(np.random.normal(loc=lx, scale=sx, size=size), np.random.normal(loc=ly, scale=sy, size=size))]
 
-    sx = sx + 3
-    sy = sy + 3
+    sx = sx + 4
+    sy = sy + 4
     zones = [Obstacle(int(x), int(y), 2, ZONE_COLOR) for (x, y) in
              zip(np.random.normal(loc=lx, scale=sx, size=size), np.random.normal(loc=ly, scale=sy, size=size))]
     return craters, zones

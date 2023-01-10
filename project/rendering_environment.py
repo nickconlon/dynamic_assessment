@@ -21,8 +21,7 @@ class Agent:
         self.goal_label = goal_label
         self.policy = policy.q_policies(policy_paths, policy_labels)
         self.env = single_agent_environment.Environment(self.current_location, self.goal_label,
-                                                        _obstacles=_obstacles, _zones=_zones, _craters=_craters,
-                                                        _zone_transition=0.1)
+                                                        _obstacles=_obstacles, _zones=_zones, _craters=_craters)
         self.done = False
         self.static_assessment = StaticAssessment()
         self.dynamic_assessment = DynamicAssessment()
@@ -50,12 +49,12 @@ class Agent:
         else:
             predicted_craters_t = self.predicted_craters_seen[:, self.assessment_index+1]
             observed_craters_t = self.actual_craters_seen[self.timestep]
-            p_craters = self.dynamic_assessment.sigma_bounds_1d(predicted_craters_t, observed_craters_t)
+            p_craters = self.dynamic_assessment.normal_surprise_1d(predicted_craters_t, observed_craters_t)
 
             predicted_zones_t = self.predicted_zones_seen[:, self.assessment_index + 1]
             observed_zones_t = self.actual_zones_seen[self.timestep]
-            p_zones = self.dynamic_assessment.sigma_bounds_1d(predicted_zones_t, observed_zones_t)
-            p_expected = p_craters | p_zones
+            p_zones = self.dynamic_assessment.normal_surprise_1d(predicted_zones_t, observed_zones_t)
+            p_expected = p_craters & p_zones
             '''
             try:
                 predicted_state_t = copy.deepcopy(self.predicted_state[:, self.assessment_index])
@@ -72,16 +71,16 @@ class Agent:
                 print('assessing due to surprising data')
 
         if should_assess:
-            self.assessment_index = 0
+            self.assessment_index = 1
             return self.choose_goal(goals)
         self.assessment_index += 1
         return None
 
     def choose_goal(self, goals, printing=True):
         self.assessments += 1
-        scores = np.zeros(3)
+        scores = np.zeros(len(goals))
         reports = [None, None, None]
-        for goal_idx in range(3):
+        for goal_idx in range(len(goals)):
             goa_report = self._assess(goals[goal_idx])
             reports[goal_idx] = goa_report
             scores[goal_idx] = goa_report.delivery_goa
@@ -105,7 +104,7 @@ class Agent:
             print(' {}'.format(int(mu_zones)) + u" \u00B1 " + '{} zones'.format(int(std_zones)))
             print('\n')
             print(scores)
-        return best_zone_idx, [configs.AssessmentReport.convert_famsec(s) for s in scores]
+        return best_zone_idx, [configs.AssessmentReport.convert_famsec(s) for s in scores], scores
 
     def event(self, new_craters=None, new_zones=None, new_goal_label=None):
         self.env.change_event(new_craters=new_craters, new_zones=new_zones, new_goal_label=new_goal_label)
@@ -149,7 +148,9 @@ class Agent:
             copy_env,
             self.current_location,
             configs.OA_ROLLOUTS,
-            configs.STATE_UNCERTAINTY)
+            configs.STATE_UNCERTAINTY,
+            craters_already_hit=self.craters,
+            zones_already_hit=self.zones)
 
         return report
 

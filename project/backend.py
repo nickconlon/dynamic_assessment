@@ -221,6 +221,8 @@ def run_main(_agent_id, _mission_id, _subject_id, _color,
                 robot_state.collision_count += info['collisions']
                 robot_state.zone_count += info['zones']
                 robot_state.reward_count += info['rewards']
+                robot_state.current_zones_seen = info['zones_seen']
+                robot_state.current_craters_seen = info['craters_seen']
                 robot_state.location = tuple(env.xy_from_index(state))
 
                 if done:
@@ -272,10 +274,19 @@ def run_main(_agent_id, _mission_id, _subject_id, _color,
                         needs_assessment = True
                     else:
                         try:
-                            predicted_state_t = copy.deepcopy(robot_state.most_recent_report.predicted_states[:, robot_state.assessment_index])
-                            predicted_state_t = predicted_state_t[~np.isnan(predicted_state_t).any(axis=1), :]
-                            p_expected = dynamics.tail(predicted_state_t, env.xy_from_index(state))
-                            print("tail: {:.2f}".format(p_expected))
+                            predicted_craters_t = copy.deepcopy(robot_state.most_recent_report.predicted_craters_fov[:, robot_state.assessment_index])
+                            observed_craters_t = copy.deepcopy(robot_state.current_craters_seen)
+                            p_craters = dynamics.sigma_bounds_1d(predicted_craters_t, observed_craters_t)
+
+                            predicted_zones_t = copy.deepcopy(robot_state.most_recent_report.predicted_dust_fov[:, robot_state.assessment_index])
+                            observed_zones_t = copy.deepcopy(robot_state.current_zones_seen)
+                            p_zones = dynamics.sigma_bounds_1d(predicted_zones_t, observed_zones_t)
+                            p_expected = p_craters & p_zones
+
+                            #predicted_state_t = copy.deepcopy(robot_state.most_recent_report.predicted_states[:, robot_state.assessment_index])
+                            #predicted_state_t = predicted_state_t[~np.isnan(predicted_state_t).any(axis=1), :]
+                            #p_expected = dynamics.tail(predicted_state_t, env.xy_from_index(state))
+                            #print("tail: {:.2f}".format(p_expected))
                         except Exception as e:
                             p_expected = 0.0
                             print(e)

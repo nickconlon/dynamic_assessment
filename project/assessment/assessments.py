@@ -2,6 +2,7 @@ import copy
 import sys
 import numpy as np
 from scipy import stats
+import matplotlib.pyplot as plt
 from project.assessment.famsec import FaMSeC
 import project.multiagent_configs as configs
 
@@ -56,7 +57,7 @@ class StaticAssessment(CompetencyAssessmentBase):
         return rewards, collisions, zones, predictions, times, deliveries
 
     @staticmethod
-    def rollout_all(policy, env, state, num_rollouts, transition_uncertainty):
+    def rollout_all(policy, env, state, num_rollouts, transition_uncertainty, craters_already_hit=0, zones_already_hit=0):
         max_length = 250
 
         crater_collisions = np.zeros(num_rollouts)
@@ -69,8 +70,8 @@ class StaticAssessment(CompetencyAssessmentBase):
         for i in range(num_rollouts):
             s = env.reset(state=state)
             state_predictions[i, 0, :] = env.xy_from_index(s)
-            zones_seen_at_time[i, 0, 0] = 0
-            craters_seen_at_time[i, 0, 0] = 0
+            zones_seen_at_time[i, 0, 0] = zones_already_hit
+            craters_seen_at_time[i, 0, 0] = craters_already_hit
             for j in range(max_length - 1):
                 # a = policy.pi(s)
                 action = policy.noisy_pi(s, transition_uncertainty)
@@ -112,8 +113,8 @@ class StaticAssessment(CompetencyAssessmentBase):
         zones_oa = np.around(zones_oa, decimals=2)
         return collisions_oa, np.mean(collisions), np.std(collisions), zones_oa, np.mean(zones), np.std(zones), states
 
-    def run_another_assessment(self, policy, env, state, num_rollouts, transition_uncertainty):
-        report = self.rollout_all(policy, env, state, num_rollouts, transition_uncertainty)
+    def run_another_assessment(self, policy, env, state, num_rollouts, transition_uncertainty, craters_already_hit=0, zones_already_hit=0):
+        report = self.rollout_all(policy, env, state, num_rollouts, transition_uncertainty, craters_already_hit, zones_already_hit)
 
         partition = np.array([-2, 0, 2])
         z_star = 2
@@ -365,6 +366,30 @@ class DynamicAssessment(CompetencyAssessmentBase):
             return 1
         else:
             return 0
+
+    @staticmethod
+    def normal_surprise_1d(predicted, actual, plot=False):
+        predicted = np.squeeze(predicted)
+        _myclip_a = max(0, min(predicted) - 10)
+        _myclip_b = max(actual + 10, max(predicted) + 10)
+        _loc = np.mean(predicted)
+        _scale = np.maximum(np.std(predicted), 1)
+        _a, _b = (_myclip_a - _loc) / _scale, (_myclip_b - _loc) / _scale
+        _model = stats.truncnorm(_a, _b, loc=_loc, scale=_scale)
+        _x = np.linspace(_myclip_a, _myclip_b, num=500)
+        _dist = abs(_loc - actual)
+        _si = _model.cdf(_loc - _dist) + (1 - _model.cdf(_loc + _dist))
+        if plot:
+            y = _model.pdf(_x)
+            plt.plot(_x, y)
+            plt.scatter([_loc - _dist, _loc + _dist], [_model.pdf(_loc - _dist), _model.pdf(_loc + _dist)], c='red')
+            plt.plot([_loc + _dist, _loc + _dist], [0, _model.pdf(_loc + _dist)], c='red')
+            plt.plot([_loc - _dist, _loc - _dist], [0, _model.pdf(_loc - _dist)], c='red')
+            plt.title("full:{:.2f}, SI:{:.2f}".format(_model.cdf(_myclip_b), _si))
+            plt.pause(0.1)
+            plt.clf()
+        return _si > 0.05
+
 
 '''
 d = DynamicAssessment()
