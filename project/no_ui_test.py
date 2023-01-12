@@ -37,6 +37,7 @@ def run_difficulty(num_runs, craters_run, craters_event1, craters_event2, zones_
         new_craters = craters_run[delivery]
         new_zones = zones_run[delivery]
         confidence = {}
+        conf_test = np.ones((3, 2)) * -1
         rendering.reset()
         a1.reset(initial_state)
         a1.env.agent_FOV = 6
@@ -49,6 +50,7 @@ def run_difficulty(num_runs, craters_run, craters_event1, craters_event2, zones_
         a1.event(new_goal_label=goal)
         out = a1.choose_goal([goal])
         confidence[0] = out[2][0]
+        conf_test[0] = [0, out[2][0]]
         done = False
         for i in range(35):
             if i == 10:
@@ -63,13 +65,15 @@ def run_difficulty(num_runs, craters_run, craters_event1, craters_event2, zones_
                 a1.step()
                 out = a1.dynamic_assess([goal])
                 if out is not None:
+                    # save off the post-event assessment
+                    if i >= 10 and conf_test[1][0] < 0:
+                        conf_test[1] = [i, out[2][0]]
+                    elif i >= 30 and conf_test[2][0] < 0:
+                        conf_test[2] = [i, out[2][0]]
                     confidence[i] = out[2][0]
 
             rendering.state_update(a1.get_state())
             #rendering.render(mode='human')
-            if a1.craters >= 5:
-                pass
-                # done = True
             if done:
                 if a1.craters < 5:
                     deliveries[delivery] = 1
@@ -77,7 +81,8 @@ def run_difficulty(num_runs, craters_run, craters_event1, craters_event2, zones_
         zones[delivery] = a1.zones
         craters[delivery] = a1.craters
         assessments[delivery] = a1.assessments
-        confidences.append(confidence)
+        if -1 not in conf_test:
+            confidences.append(conf_test)
         print('  zones:   ', a1.zones)
         print('  craters: ', a1.craters)
         print('  deliveries: ', sum(deliveries))
@@ -172,7 +177,7 @@ def write_csv(condition, zones, craters, deliveries, assessments):
 
 
 def task_difficulty():
-    num_runs = 100
+    num_runs = 150
     craters1 = []
     zones1 = []
     craters2 = []
@@ -209,11 +214,11 @@ def task_difficulty():
     conditions = []
     conf = []
     time = []
-    for l in confidence:
-        for t, c in l.items():
+    for _run in confidence:
+        for event in _run:
             conditions.append('easy->hard')
-            conf.append(c)
-            time.append(t)
+            time.append(event[0])
+            conf.append(event[1])
     header = "condition, confidence, time"
     with open('difficulty_all.csv', 'w') as file:
         file.write(header + '\n')
@@ -227,11 +232,11 @@ def task_difficulty():
     conditions = []
     conf = []
     time = []
-    for l in confidence:
-        for t, c in l.items():
+    for _run in confidence:
+        for event in _run:
             conditions.append('hard->easy')
-            conf.append(c)
-            time.append(t)
+            time.append(event[0])
+            conf.append(event[1])
     with open('difficulty_all.csv', 'a') as file:
         for (cond, c, t) in zip(conditions, conf, time):
             file.write('{},{},{}\n'.format(cond, c, t))
@@ -378,5 +383,5 @@ if __name__ == '__main__':
     # random_guided_dynamic()
     # make_static()
     # make_dynamic()
-    #task_difficulty()
-    make_all()
+    task_difficulty()
+    #make_all()
