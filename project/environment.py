@@ -75,11 +75,17 @@ class Environment(Env):
         index = x + self.maxX * y
         return int(index)
 
+    def obstacle_in_fov(self, obstacle):
+        d = np.linalg.norm(obstacle.xy - np.asarray(self.pos))
+        if d <= (obstacle.r + self.agent_FOV):
+            return True
+        else:
+            return False
+
     def obstacles_in_fov(self, obstacles):
         zone_count = 0
         for obstacle in obstacles:
-            d = np.linalg.norm(obstacle.xy - np.asarray(self.pos))
-            if d <= (obstacle.r + self.agent_FOV):
+            if self.obstacle_in_fov(obstacle):
                 zone_count += 1
         return zone_count
 
@@ -113,7 +119,6 @@ class Environment(Env):
             self.pos += self.actions[action]
 
         # Count up the craters we hit with the transition
-
         for crater in self.craters:
             if crater.collision(*self.pos):
                 if np.random.rand() > self.probability_avoiding_crater:
@@ -208,13 +213,13 @@ class Environment(Env):
             _image = cv2.line(_image, (minn + 5, y + 5), (maxx + 5, y + 5), color=(0, 0, 0), thickness=2)
         return _image
 
-    def draw_shapes(self, img, position, color):
+    def draw_shapes(self, img, position, color, fov):
         """
         Shaded areas for obstacles.
         """
         shapes = img.copy()
         shapes = cv2.circle(shapes, (position[0] * self.scale, position[1] * self.scale),
-                            self.agent_FOV * self.scale, color, cv2.FILLED)
+                            fov * self.scale, color, cv2.FILLED)
         out = img.copy()
         alpha = 0.4
         cv2.addWeighted(shapes, alpha, img, 1 - alpha, 0, out)
@@ -237,7 +242,7 @@ class Environment(Env):
         _image = cv2.circle(_image, (self.pos_home[0] * self.scale, self.pos_home[1] * self.scale), self.goal_eps * self.scale,
                             self.home_color, thickness=2)
 
-        _image = self.draw_shapes(_image, self.pos, (0,0,255))
+        _image = self.draw_shapes(_image, self.pos, (0,0,255), self.agent_FOV)
 
         for obstacle in self.obstacles:
             _image = cv2.circle(_image, (obstacle.xy[0] * self.scale, obstacle.xy[1] * self.scale), obstacle.r * self.scale,

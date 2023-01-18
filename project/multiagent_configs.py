@@ -2,6 +2,7 @@ import numpy as np
 import json
 import base64
 import cv2
+import uuid
 
 #
 # Communications and topics
@@ -361,6 +362,7 @@ class Obstacle:
         self.xy = np.asarray([x, y])
         self.r = radius
         self.color = color
+        self.id = uuid.uuid4()
 
     def collision(self, x, y):
         d = np.linalg.norm(self.xy - np.asarray([x, y]))

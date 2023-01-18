@@ -6,6 +6,7 @@ import pandas as pd
 
 import project.multiagent_configs as configs
 from project.rendering_environment import Agent, MultiAgentRendering
+from project.environment import Environment
 
 sns.set_theme()
 
@@ -21,44 +22,45 @@ def run_difficulty(num_runs, craters_run, craters_event1, craters_event2, zones_
                               configs.LOCATIONS[configs.AREA_1].name,
                               configs.LOCATIONS[configs.AREA_2].name,
                               configs.LOCATIONS[configs.AREA_3].name]
-    a1 = Agent(1, (0, 0, 255), initial_state, configs.AREA_1, available_policies, available_target_names,
-               _obstacles=[], _zones=craters_run, _craters=zones_run)
 
-    rendering = MultiAgentRendering([1, 2])
-    rendering.agent_FOV = 6
+    a1 = Agent(1, (0, 0, 255), initial_state, configs.AREA_1, available_policies, available_target_names,
+               _all_zones=craters_run, _all_craters=zones_run, fov=10)
+
+    rendering = MultiAgentRendering([1])
+    rendering.agent_FOV = 20
 
     zones = np.zeros(num_runs, dtype=int)
     craters = np.zeros(num_runs, dtype=int)
     deliveries = np.zeros(num_runs, dtype=int)
     assessments = np.zeros(num_runs, dtype=int)
     confidences = []
+    all_confidences = []
     for delivery in range(num_runs):
         print('Round {}/{}'.format(delivery, num_runs))
         new_craters = craters_run[delivery]
         new_zones = zones_run[delivery]
-        confidence = {}
+        all_confidence = {}
         conf_test = np.ones((3, 2)) * -1
         rendering.reset()
         a1.reset(initial_state)
-        a1.env.agent_FOV = 6
-        a1.event(new_zones=new_zones, new_craters=new_craters)
-        rendering.change_event(new_zones=new_zones, new_craters=new_craters)
+        suspected_crater_ids = set([c.id for c in new_craters])
+        suspected_zone_ids = set([c.id for c in new_zones])
+        a1.event(_all_zones=new_zones, _all_craters=new_craters,
+                 _suspected_craters=suspected_crater_ids, _suspected_zones=suspected_zone_ids)
 
         #######
         # Choosing the goal here based on self-confidence
         goal = configs.AREA_3
         a1.event(new_goal_label=goal)
         out = a1.choose_goal([goal])
-        confidence[0] = out[2][0]
+        all_confidence[0] = [delivery, out[2][0]]
         conf_test[0] = [0, out[2][0]]
         done = False
         for i in range(35):
             if i == 10:
-                a1.env.change_event(new_craters=craters_event1[delivery], new_zones=zones_event1[delivery])
-                rendering.change_event(new_craters=craters_event1[delivery], new_zones=zones_event1[delivery])
+                a1.real_env.change_event(new_craters=craters_event1[delivery], new_zones=zones_event1[delivery])
             if i == 30:
-                a1.env.change_event(new_craters=craters_event2[delivery], new_zones=zones_event2[delivery])
-                rendering.change_event(new_craters=craters_event2[delivery], new_zones=zones_event2[delivery])
+                a1.real_env.change_event(new_craters=craters_event2[delivery], new_zones=zones_event2[delivery])
             if a1.is_done():
                 done = True
             else:
@@ -70,9 +72,10 @@ def run_difficulty(num_runs, craters_run, craters_event1, craters_event2, zones_
                         conf_test[1] = [i, out[2][0]]
                     elif i >= 30 and conf_test[2][0] < 0:
                         conf_test[2] = [i, out[2][0]]
-                    confidence[i] = out[2][0]
+                    all_confidence[i] = [delivery, out[2][0]]
 
-            rendering.state_update(a1.get_state())
+            #rendering.state_update(a1.get_state())
+            #rendering.change_event(new_zones=a1.get_aware_zones(), new_craters=a1.get_aware_craters())
             #rendering.render(mode='human')
             if done:
                 if a1.craters < 5:
@@ -81,14 +84,15 @@ def run_difficulty(num_runs, craters_run, craters_event1, craters_event2, zones_
         zones[delivery] = a1.zones
         craters[delivery] = a1.craters
         assessments[delivery] = a1.assessments
+        all_confidences.append(all_confidence)
         if -1 not in conf_test:
             confidences.append(conf_test)
         print('  zones:   ', a1.zones)
         print('  craters: ', a1.craters)
         print('  deliveries: ', sum(deliveries))
         print('  assessments: ', a1.assessments)
-        print('  confidences: ', confidences)
-    return zones, craters, deliveries, assessments, confidences
+        print('  confidences: ', confidences[delivery])
+    return zones, craters, deliveries, assessments, confidences, all_confidences
 
 
 def run(run_type, num_runs, craters_run, craters_event, zones_run, zones_event):
@@ -102,11 +106,12 @@ def run(run_type, num_runs, craters_run, craters_event, zones_run, zones_event):
                               configs.LOCATIONS[configs.AREA_1].name,
                               configs.LOCATIONS[configs.AREA_2].name,
                               configs.LOCATIONS[configs.AREA_3].name]
-    a1 = Agent(1, (0, 0, 255), initial_state, configs.AREA_1, available_policies, available_target_names,
-               _obstacles=[], _zones=craters_run, _craters=zones_run)
 
-    rendering = MultiAgentRendering([1, 2])
-    rendering.agent_FOV = 6
+    a1 = Agent(1, (0, 0, 255), initial_state, configs.AREA_1, available_policies, available_target_names,
+               _all_obstacles=[], _all_zones=craters_run, _all_craters=zones_run, fov=10)
+
+    rendering = MultiAgentRendering([1])
+    rendering.agent_FOV = 10
 
     zones = np.zeros(num_runs, dtype=int)
     craters = np.zeros(num_runs, dtype=int)
@@ -118,9 +123,11 @@ def run(run_type, num_runs, craters_run, craters_event, zones_run, zones_event):
         new_zones = zones_run[delivery]
         rendering.reset()
         a1.reset(initial_state)
-        a1.env.agent_FOV = 6
-        a1.event(new_zones=new_zones, new_craters=new_craters)
-        rendering.change_event(new_zones=new_zones, new_craters=new_craters)
+        a1.real_env.agent_FOV = 10
+        suspected_crater_ids = set([c.id for c in new_craters])
+        suspected_zone_ids = set([c.id for c in new_zones])
+        a1.event(_all_zones=new_zones, _all_craters=new_craters,
+                 _suspected_craters=suspected_crater_ids, _suspected_zones=suspected_zone_ids)
 
         #######
         # Choosing the goal here based on self-confidence
@@ -149,11 +156,11 @@ def run(run_type, num_runs, craters_run, craters_event, zones_run, zones_event):
                     a1.event(new_goal_label=goals[trigger[0]])
             if 'dynamic' in run_type and not done:
                 if i == 10:
-                    a1.env.change_event(new_craters=craters_event[delivery], new_zones=zones_event[delivery])
-                    rendering.change_event(new_craters=craters_event[delivery], new_zones=zones_event[delivery])
+                    a1.real_env.change_event(new_craters=craters_event[delivery], new_zones=zones_event[delivery])
 
-            rendering.state_update(a1.get_state())
-            # rendering.render(mode='human')
+            #rendering.state_update(a1.get_state())
+            #rendering.change_event(new_zones=a1.get_aware_zones(), new_craters=a1.get_aware_craters())
+            #rendering.render(mode='human')
             if done:
                 if a1.craters < 5:
                     deliveries[delivery] = 1
@@ -177,69 +184,91 @@ def write_csv(condition, zones, craters, deliveries, assessments):
 
 
 def task_difficulty():
-    num_runs = 150
+    num_runs = 130
     craters1 = []
     zones1 = []
     craters2 = []
     zones2 = []
     craters_empty = []
     zones_empty = []
-    gl = (38, 47)
     for i in range(num_runs):
-        lxrange = (gl[0] - 10, gl[0])  # (5, 45)
-        lyrange = (gl[1] - 15, gl[1] - 5)  # (5, 45)
-        srange = (2, 5)
+        srange = (4, 8)
 
-        c1, z1 = configs.create_new_craters(50,
-                                            lxrange=(25, 30),
-                                            lyrange=(25, 35),
+        c1, z1 = configs.create_new_craters(100,
+                                            lxrange=(15, 30),
+                                            lyrange=(15, 35),
                                             sxrange=srange,
                                             syrange=srange)
-        c2, z2 = configs.create_new_craters(50,
-                                            lxrange=(30, 40),
-                                            lyrange=(35, 45),
+        c2, z2 = configs.create_new_craters(100,
+                                            lxrange=(25, 40),
+                                            lyrange=(25, 45),
                                             sxrange=srange,
                                             syrange=srange)
         craters1.append(c1)
-        zones1.append(z1)
+        zones1.append([])
         craters2.append(c2)
-        zones2.append(z2)
+        zones2.append([])
         craters_empty.append([])
         zones_empty.append([])
 
     # easy -> hard -> easy
-    zones, craters, deliveries, assessments, confidence = run_difficulty(num_runs,
+    zones, craters, deliveries, assessments, confidence, all_confidences = run_difficulty(num_runs,
                                                                          craters_empty, craters1, craters_empty,
                                                                          zones_empty, zones1, zones_empty)
     conditions = []
     conf = []
     time = []
+    runid = []
+    idx = 0
+    confidence = confidence[:100]
     for _run in confidence:
+        idx+=1
         for event in _run:
             conditions.append('easy->hard')
             time.append(event[0])
             conf.append(event[1])
-    header = "condition, confidence, time"
+            runid.append(idx)
+    header = "condition, confidence, time, runid"
     with open('difficulty_all.csv', 'w') as file:
         file.write(header + '\n')
-        for (cond, c, t) in zip(conditions, conf, time):
-            file.write('{},{},{}\n'.format(cond, c, t))
+        for (cond, c, t, rid) in zip(conditions, conf, time, runid):
+            file.write('{},{},{},{}\n'.format(cond, c, t, rid))
+
+    with open('difficulty_all_conf.csv', 'w') as file:
+        file.write("condition, confidence, time, runid" + '\n')
+        for run in all_confidences:
+            for t, d in run.items():
+                rid = d[0]
+                c = d[1]
+                file.write('{},{},{},{}\n'.format('easy->hard', c, t, rid))
 
     # hard -> easy -> hard
-    zones, craters, deliveries, assessments, confidence = run_difficulty(num_runs,
+    zones, craters, deliveries, assessments, confidence, all_confidences = run_difficulty(num_runs,
                                                                          craters1, craters_empty, craters2,
                                                                          zones1, zones_empty, zones2)
     conditions = []
     conf = []
     time = []
+    runid = []
+    idx = 0
+    confidence = confidence[:100]
     for _run in confidence:
+        idx+=1
         for event in _run:
             conditions.append('hard->easy')
             time.append(event[0])
             conf.append(event[1])
+            runid.append(idx)
     with open('difficulty_all.csv', 'a') as file:
-        for (cond, c, t) in zip(conditions, conf, time):
-            file.write('{},{},{}\n'.format(cond, c, t))
+        for (cond, c, t, rid) in zip(conditions, conf, time, runid):
+            file.write('{},{},{}\n'.format(cond, c, t, rid))
+
+    with open('difficulty_all_conf.csv', 'a') as file:
+        for run in all_confidences:
+            for t, d in run.items():
+                rid = d[0]
+                c = d[1]
+                file.write('{},{},{},{}\n'.format('hard->easy', c, t, rid))
 
 
 def random_guided_human():
@@ -380,8 +409,9 @@ def make_all():
     data.to_csv('data_all.csv', index=False)
 
 if __name__ == '__main__':
-    # random_guided_dynamic()
-    # make_static()
-    # make_dynamic()
-    task_difficulty()
+    random_guided_dynamic()
+    #make_static()
+    #make_dynamic()
     #make_all()
+    task_difficulty()
+

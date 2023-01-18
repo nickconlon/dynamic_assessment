@@ -388,7 +388,7 @@ class DynamicAssessment(CompetencyAssessmentBase):
             plt.title("full:{:.2f}, SI:{:.2f}".format(_model.cdf(_myclip_b), _si))
             plt.pause(0.1)
             plt.clf()
-        return _si > 0.05
+        return _si
 
 
 '''
